@@ -1,5 +1,5 @@
 export interface Standort {
-  id: number;
+  id: string;
   name: string;
   adresse: string;
   plz: string;

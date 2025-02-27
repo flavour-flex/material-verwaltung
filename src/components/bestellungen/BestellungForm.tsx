@@ -111,6 +111,7 @@ export default function BestellungForm({ standortId }: Props) {
       const { data, error } = await supabase
         .from('artikel')
         .select('*')
+        .in('kategorie', ['Verbrauchsmaterial', 'Büromaterial'])
         .order('name');
       
       if (error) throw error;

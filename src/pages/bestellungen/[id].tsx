@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import Layout from '@/components/Layout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -7,6 +7,9 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
+import { queryClient } from '@/lib/queryClient';
+import { sendBestellungVersendetEmail } from '@/lib/email';
 
 export default function BestellungDetailsPage() {
   const router = useRouter();
@@ -53,6 +56,48 @@ export default function BestellungDetailsPage() {
       return data;
     },
     enabled: !!id,
+  });
+
+  const markAsVersandtMutation = useMutation({
+    mutationFn: async (bestellungId: string) => {
+      const { data: bestellung, error: updateError } = await supabase
+        .from('bestellungen')
+        .update({ status: 'versandt' })
+        .eq('id', bestellungId)
+        .select(`
+          id,
+          standort:standort_id (
+            name,
+            verantwortlicher:verantwortlicher_id (
+              email,
+              full_name
+            )
+          ),
+          artikel:bestellung_artikel (
+            artikel:artikel_id (
+              name,
+              artikelnummer
+            ),
+            menge,
+            versandte_menge
+          )
+        `)
+        .single();
+
+      if (updateError) throw updateError;
+
+      await sendBestellungVersendetEmail(bestellung);
+
+      return bestellung;
+    },
+    onSuccess: () => {
+      toast.success('Bestellung wurde als versendet markiert');
+      queryClient.invalidateQueries({ queryKey: ['bestellung'] });
+    },
+    onError: (error) => {
+      toast.error('Fehler beim Markieren der Bestellung als versendet');
+      console.error('Fehler:', error);
+    }
   });
 
   if (isLoading) return <LoadingSpinner />;

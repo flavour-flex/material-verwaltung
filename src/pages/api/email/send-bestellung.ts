@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -10,30 +9,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Hole die Hauptlager-Email aus den Einstellungen
-    const { data: einstellungen, error: settingsError } = await supabase
-      .from('einstellungen')
-      .select('hauptlager_email')
-      .single();
-
-    if (settingsError) throw settingsError;
-    if (!einstellungen?.hauptlager_email) {
-      throw new Error('Keine Hauptlager-Email konfiguriert');
-    }
-
-    const { bestellung } = req.body;
-    
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY ist nicht konfiguriert');
-    }
-
-    if (!process.env.EMAIL_FROM) {
-      throw new Error('EMAIL_FROM ist nicht konfiguriert');
-    }
+    const { email, bestellung } = req.body;
 
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM,
-      to: einstellungen.hauptlager_email,
+      from: process.env.EMAIL_FROM!,
+      to: email,
       subject: `Neue Bestellung von ${bestellung.standort?.name || 'Unbekannter Standort'}`,
       html: `
         <h1>Neue Bestellung eingegangen</h1>
@@ -44,27 +24,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             <li>${pos.artikel?.name || 'Unbekannter Artikel'} - ${pos.menge} Stück</li>
           `).join('')}
         </ul>
-      `,
-    });
-
-    console.log('Email sending attempt:', {
-      to: einstellungen.hauptlager_email,
-      bestellung: bestellung,
-      resendResponse: { data, error }
+      `
     });
 
     if (error) {
-      console.error('Resend error:', error);
+      console.error('Email error:', error);
       return res.status(500).json({ error: error.message });
     }
 
-    res.status(200).json({ success: true, data });
+    return res.status(200).json(data);
   } catch (error: any) {
-    console.error('Detailed error:', error);
-    res.status(500).json({ 
-      error: 'Failed to send email',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('Error sending email:', error);
+    return res.status(500).json({ error: error.message });
   }
 } 
