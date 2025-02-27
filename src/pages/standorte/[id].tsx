@@ -71,6 +71,7 @@ export default function StandortDetailPage() {
     queryFn: async () => {
       if (!id) return { verbrauchsmaterial: [], bueromaterial: [] };
 
+      // Wareneingänge laden
       const { data: wareneingaenge, error: wareneingangError } = await supabase
         .from('wareneingang')
         .select(`
@@ -83,78 +84,82 @@ export default function StandortDetailPage() {
             einheit
           ),
           menge,
-          lagerorte,
-          bestellung:bestellung_id (
-            id,
-            created_at
-          )
+          lagerorte
         `)
         .eq('standort_id', id);
 
-      console.log('Rohdaten von Supabase:', wareneingaenge);
+      // Nur nicht-stornierte Ausbuchungen laden
+      const { data: ausbuchungen, error: ausbuchungError } = await supabase
+        .from('ausbuchungen')
+        .select(`
+          id,
+          artikel_id,
+          menge,
+          lagerort,
+          storniert
+        `)
+        .eq('standort_id', id)
+        .eq('storniert', false); // Nur nicht-stornierte Ausbuchungen
 
       if (wareneingangError) throw wareneingangError;
+      if (ausbuchungError) throw ausbuchungError;
 
-      // Warenbestand nach Artikel gruppieren
+      // Bestandsmap initialisieren
       const bestandMap = new Map();
 
+      // Wareneingänge verarbeiten
       wareneingaenge?.forEach((eingang) => {
-        if (!eingang?.artikel) {
-          console.log('Überspringe Eingang ohne Artikel:', eingang);
-          return;
-        }
+        if (!eingang?.artikel) return;
 
         const artikelId = eingang.artikel.id;
         const current = bestandMap.get(artikelId) || {
           artikel: eingang.artikel,
           menge: 0,
-          lagerorte: [],
-          bestellung: eingang.bestellung
+          lagerorte: new Map()
         };
 
         current.menge += eingang.menge;
 
-        // Lagerorte zusammenführen
+        // Lagerorte verarbeiten
         if (Array.isArray(eingang.lagerorte)) {
-          eingang.lagerorte.forEach((lo: { lagerort: string, menge: number }) => {
-            const existingLagerort = current.lagerorte.find(
-              (l: { lagerort: string }) => l.lagerort === lo.lagerort
-            );
-
-            if (existingLagerort) {
-              existingLagerort.menge += lo.menge;
-            } else {
-              current.lagerorte.push({ ...lo });
-            }
+          eingang.lagerorte.forEach((lo) => {
+            const aktMenge = current.lagerorte.get(lo.lagerort) || 0;
+            current.lagerorte.set(lo.lagerort, aktMenge + lo.menge);
           });
         }
 
         bestandMap.set(artikelId, current);
       });
 
-      // Konvertiere Map zu Array und filtere nach Kategorie
-      const alleArtikel = Array.from(bestandMap.values());
-      
-      console.log('Alle Artikel vor Filterung:', alleArtikel);
+      // Nur nicht-stornierte Ausbuchungen abziehen
+      ausbuchungen?.forEach((ausbuchung) => {
+        const current = bestandMap.get(ausbuchung.artikel_id);
+        if (!current) return;
 
-      // Kategorien case-insensitive vergleichen
-      const verbrauchsmaterial = alleArtikel.filter(
-        artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
-      );
+        // Menge abziehen
+        current.menge -= ausbuchung.menge;
 
-      const bueromaterial = alleArtikel.filter(
-        artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
-      );
-
-      console.log('Gefilterte Artikel:', {
-        verbrauchsmaterial,
-        bueromaterial,
-        kategorien: alleArtikel.map(a => a.artikel?.kategorie)
+        // Lagerortmenge reduzieren
+        const aktMenge = current.lagerorte.get(ausbuchung.lagerort) || 0;
+        current.lagerorte.set(ausbuchung.lagerort, aktMenge - ausbuchung.menge);
       });
 
+      // Map in Array umwandeln und Lagerorte formatieren
+      const alleArtikel = Array.from(bestandMap.values()).map(artikel => ({
+        ...artikel,
+        lagerorte: Array.from(artikel.lagerorte.entries()).map(([lagerort, menge]) => ({
+          lagerort,
+          menge
+        }))
+      }));
+
       return {
-        verbrauchsmaterial,
-        bueromaterial
+        verbrauchsmaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
+        ),
+        bueromaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
+        )
       };
     },
     staleTime: 0,
@@ -383,11 +388,6 @@ export default function StandortDetailPage() {
                           <span className="ml-2">{lagerort.menge}</span>
                         </div>
                       ))}
-                      {position.bestellung && (
-                        <div className="text-indigo-600">
-                          Bestellt vom {format(new Date(position.bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
-                        </div>
-                      )}
                     </td>
                   </tr>
                 ))}
@@ -435,11 +435,6 @@ export default function StandortDetailPage() {
                           <span className="ml-2">{lagerort.menge}</span>
                         </div>
                       ))}
-                      {position.bestellung && (
-                        <div className="text-indigo-600">
-                          Bestellt vom {format(new Date(position.bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
-                        </div>
-                      )}
                     </td>
                   </tr>
                 ))}
@@ -463,7 +458,6 @@ export default function StandortDetailPage() {
         warenbestand={warenbestand || { verbrauchsmaterial: [], bueromaterial: [] }}
         onSuccess={() => {
           queryClient.invalidateQueries(['standort-warenbestand', id]);
-          setIsAusbuchenOpen(false);
         }}
       />
     </Layout>

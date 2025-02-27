@@ -67,6 +67,11 @@ const navigation = [
     href: '/einstellungen', 
     icon: Cog6ToothIcon 
   },
+  { 
+    name: 'Ausbuchungen', 
+    href: '/ausbuchungen', 
+    icon: ClipboardDocumentListIcon 
+  },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

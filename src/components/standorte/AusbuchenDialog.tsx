@@ -5,6 +5,13 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { BestandsArtikel } from '@/types';
+import { TrashIcon } from '@heroicons/react/24/outline';
+
+interface AusbuchPosition {
+  artikel_id: string;
+  lagerort: string;
+  menge: number;
+}
 
 interface Props {
   isOpen: boolean;
@@ -18,163 +25,227 @@ interface Props {
 }
 
 export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbestand, onSuccess }: Props) {
-  const [selectedArtikel, setSelectedArtikel] = useState('');
-  const [selectedLagerort, setSelectedLagerort] = useState('');
-  const [menge, setMenge] = useState(1);
   const [referenz, setReferenz] = useState('');
-
-  // Kombiniere alle Artikel aus beiden Kategorien
-  const alleArtikel = [...(warenbestand.verbrauchsmaterial || []), ...(warenbestand.bueromaterial || [])];
-  
-  const artikel = alleArtikel.find(a => a.artikel.id === selectedArtikel) as BestandsArtikel | undefined;
-  const verfuegbareMenge = artikel?.lagerorte.get(selectedLagerort) || 0;
+  const [positionen, setPositionen] = useState<AusbuchPosition[]>([]);
+  const [currentArtikel, setCurrentArtikel] = useState('');
+  const [currentLagerort, setCurrentLagerort] = useState('');
+  const [currentMenge, setCurrentMenge] = useState<number>(1);
 
   const queryClient = useQueryClient();
 
+  // Alle verfügbaren Artikel
+  const alleArtikel = [
+    ...(warenbestand?.verbrauchsmaterial || []),
+    ...(warenbestand?.bueromaterial || [])
+  ];
+
+  // Finde den aktuell ausgewählten Artikel
+  const selectedArtikel = alleArtikel.find(a => a.artikel.id === currentArtikel);
+  
+  // Verfügbare Menge für den ausgewählten Lagerort
+  const verfuegbareMenge = selectedArtikel?.lagerorte?.find(l => l.lagerort === currentLagerort)?.menge || 0;
+
+  // Position hinzufügen
+  const addPosition = () => {
+    if (!selectedArtikel || !currentLagerort || currentMenge <= 0) return;
+
+    setPositionen([
+      ...positionen,
+      {
+        artikel_id: currentArtikel,
+        lagerort: currentLagerort,
+        menge: currentMenge
+      }
+    ]);
+
+    // Felder zurücksetzen
+    setCurrentArtikel('');
+    setCurrentLagerort('');
+    setCurrentMenge(1);
+  };
+
+  // Position entfernen
+  const removePosition = (index: number) => {
+    setPositionen(positionen.filter((_, i) => i !== index));
+  };
+
+  // Ausbuchen-Mutation
   const ausbuchen = useMutation({
     mutationFn: async () => {
-      if (!artikel) throw new Error('Kein Artikel ausgewählt');
-      if (!selectedLagerort) throw new Error('Kein Lagerort ausgewählt');
-      if (menge <= 0) throw new Error('Ungültige Menge');
-      if (menge > verfuegbareMenge) throw new Error('Nicht genügend Bestand');
+      if (positionen.length === 0) {
+        throw new Error('Keine Positionen zum Ausbuchen');
+      }
 
-      const { error } = await supabase
-        .from('ausgang')
-        .insert({
+      // Alle Ausbuchungen in einer Transaktion durchführen
+      const { error } = await supabase.from('ausbuchungen').insert(
+        positionen.map(pos => ({
           standort_id: standortId,
-          artikel_id: selectedArtikel,
-          menge,
-          lagerort: selectedLagerort,
-          referenz
-        });
+          artikel_id: pos.artikel_id,
+          menge: pos.menge,
+          lagerort: pos.lagerort,
+          referenz: referenz.trim(),
+          storniert: false
+        }))
+      );
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Artikel erfolgreich ausgebucht');
+      queryClient.invalidateQueries(['standort-warenbestand', standortId]);
       onSuccess();
-      resetForm();
+      onClose();
+      // Alles zurücksetzen
+      setPositionen([]);
+      setReferenz('');
+      setCurrentArtikel('');
+      setCurrentLagerort('');
+      setCurrentMenge(1);
+      toast.success('Artikel erfolgreich ausgebucht');
     },
-    onError: (error) => {
-      toast.error(error.message || 'Fehler beim Ausbuchen');
+    onError: (error: any) => {
+      console.error('Ausbuchung error:', error);
+      toast.error(`Fehler beim Ausbuchen: ${error.message}`);
     }
   });
 
-  const resetForm = () => {
-    setSelectedArtikel('');
-    setSelectedLagerort('');
-    setMenge(1);
-    setReferenz('');
-  };
-
-  // Konvertiere Map-Entries zu Array mit expliziten Typen
-  const lagerorteEntries: [string, number][] = artikel 
-    ? Array.from(artikel.lagerorte.entries())
-    : [];
-
   return (
-    <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={onClose}>
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+    <Dialog open={isOpen} onClose={onClose}>
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
 
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-              <div>
-                <div className="mt-3 text-center sm:mt-5">
-                  <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
-                    Artikel ausbuchen
-                  </Dialog.Title>
-                  <div className="mt-4">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Artikel</label>
-                        <select
-                          value={selectedArtikel}
-                          onChange={(e) => setSelectedArtikel(e.target.value)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        >
-                          <option value="">Artikel auswählen</option>
-                          {alleArtikel.map((artikel) => (
-                            <option key={artikel.artikel.id} value={artikel.artikel.id}>
-                              {artikel.artikel.name} ({artikel.menge} verfügbar)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-2xl w-full rounded bg-white p-6">
+          <Dialog.Title className="text-lg font-medium leading-6 text-gray-900 mb-4">
+            Artikel ausbuchen
+          </Dialog.Title>
 
-                      {selectedArtikel && (
-                        <div>
-                          <label htmlFor="lagerort" className="block text-sm font-medium text-gray-700">
-                            Lagerort
-                          </label>
-                          <select
-                            id="lagerort"
-                            value={selectedLagerort}
-                            onChange={(e) => setSelectedLagerort(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                          >
-                            <option value="">Bitte wählen</option>
-                            {lagerorteEntries.map(([lagerort, menge]) => (
-                              <option key={lagerort} value={lagerort}>
-                                {lagerort} ({menge} verfügbar)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {selectedLagerort && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Menge</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max={verfuegbareMenge}
-                              value={menge}
-                              onChange={(e) => setMenge(parseInt(e.target.value))}
-                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Referenz</label>
-                            <input
-                              type="text"
-                              value={referenz}
-                              onChange={(e) => setReferenz(e.target.value)}
-                              placeholder="z.B. Wartung #123"
-                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
-                <button
-                  type="button"
-                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 sm:col-start-2"
-                  onClick={() => ausbuchen.mutate()}
-                  disabled={!selectedArtikel || !selectedLagerort || !referenz || ausbuchen.isPending}
-                >
-                  Ausbuchen
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:col-start-1 sm:mt-0"
-                  onClick={onClose}
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </Dialog.Panel>
+          {/* Referenz-Eingabe */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700">Referenz</label>
+            <input
+              type="text"
+              value={referenz}
+              onChange={(e) => setReferenz(e.target.value)}
+              placeholder="z.B. Kursnummer oder Veranstaltung"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
           </div>
-        </div>
-      </Dialog>
-    </Transition.Root>
+
+          {/* Neue Position hinzufügen */}
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Artikel</label>
+              <select
+                value={currentArtikel}
+                onChange={(e) => {
+                  setCurrentArtikel(e.target.value);
+                  setCurrentLagerort('');
+                }}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                <option value="">Bitte wählen</option>
+                {alleArtikel.map((artikel) => (
+                  <option key={artikel.artikel.id} value={artikel.artikel.id}>
+                    {artikel.artikel.name} (Gesamt: {artikel.menge})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {currentArtikel && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Lagerort</label>
+                <select
+                  value={currentLagerort}
+                  onChange={(e) => setCurrentLagerort(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option value="">Bitte wählen</option>
+                  {selectedArtikel?.lagerorte.map((lo) => (
+                    <option key={lo.lagerort} value={lo.lagerort}>
+                      {lo.lagerort} (Verfügbar: {lo.menge})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {currentLagerort && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Menge</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={verfuegbareMenge}
+                  value={currentMenge}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value > 0) {
+                      setCurrentMenge(Math.min(value, verfuegbareMenge));
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={addPosition}
+              disabled={!currentArtikel || !currentLagerort || currentMenge <= 0}
+              className="mt-4 w-full rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Position hinzufügen
+            </button>
+          </div>
+
+          {/* Liste der Positionen */}
+          {positionen.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Auszubuchende Positionen</h4>
+              <div className="space-y-2">
+                {positionen.map((pos, index) => {
+                  const artikel = alleArtikel.find(a => a.artikel.id === pos.artikel_id);
+                  return (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <div className="flex-1">
+                        <div className="font-medium">{artikel?.artikel.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {pos.menge} Stück aus {pos.lagerort}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removePosition(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Aktions-Buttons */}
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              onClick={() => ausbuchen.mutate()}
+              disabled={positionen.length === 0 || !referenz.trim() || ausbuchen.isPending}
+              className="rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {ausbuchen.isPending ? 'Wird ausgebucht...' : 'Alle Positionen ausbuchen'}
+            </button>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
   );
 } 
