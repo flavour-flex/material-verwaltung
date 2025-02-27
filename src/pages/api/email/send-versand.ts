@@ -20,7 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const artikelListe = bestellung.artikel
-      .map((pos: any) => `- ${pos.artikel.name} (${pos.versandte_menge} Stück)`)
+      .map((pos: any) => {
+        const menge = pos.versandte_menge || pos.menge;
+        return `- ${pos.artikel.name} (${menge} Stück)`;
+      })
       .join('\n');
 
     const { data, error } = await resend.emails.send({

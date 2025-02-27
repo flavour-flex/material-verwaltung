@@ -10,36 +10,49 @@ interface VersandDialogProps {
   onClose: () => void;
   bestellung: {
     id: string;
-    artikel: {
+    bestellung_artikel: {
       id: string;          // Bestellung_artikel ID
       artikel_id: string;  // Artikel ID
       menge: number;
+      versandte_menge: number;
       artikel: {
         name: string;
         artikelnummer: string;
       };
     }[];
+    standort: {
+      name: string;
+      verantwortliche: Array<{
+        name: string;
+        email: string;
+      }>;
+    };
   };
 }
 
 export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDialogProps) {
   const queryClient = useQueryClient();
   const [mengen, setMengen] = useState<Record<string, number>>(() => 
-    Object.fromEntries(bestellung.artikel.map(pos => [pos.id, pos.menge]))
+    Object.fromEntries(bestellung.bestellung_artikel.map(pos => [pos.id, pos.menge]))
   );
   const [versandTyp, setVersandTyp] = useState<'vollstaendig' | 'teillieferung'>('vollstaendig');
 
   const updateBestellung = useMutation({
     mutationFn: async () => {
       const zuVerwendeneMengen = versandTyp === 'vollstaendig' 
-        ? bestellung.artikel.map(pos => ({
+        ? bestellung.bestellung_artikel.map(pos => ({
             artikel_id: pos.artikel_id,
-            menge: pos.menge
+            menge: pos.menge,
+            versandte_menge: pos.menge
           }))
-        : Object.entries(mengen).map(([artikel_id, menge]) => ({
-            artikel_id,
-            menge
-          }));
+        : Object.entries(mengen).map(([id, menge]) => {
+            const position = bestellung.bestellung_artikel.find(p => p.id === id);
+            return {
+              artikel_id: position!.artikel_id,
+              menge,
+              versandte_menge: menge
+            };
+          });
 
       // Start a Supabase transaction
       const { data: { user } } = await supabase.auth.getUser();
@@ -47,8 +60,8 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
 
       if (versandTyp === 'teillieferung') {
         // Update die Mengen in der bestellung_artikel Tabelle
-        for (const pos of bestellung.artikel) {
-          const versandteMenge = zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.menge;
+        for (const pos of bestellung.bestellung_artikel) {
+          const versandteMenge = zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.versandte_menge;
           
           if (!pos.id) {
             throw new Error(`Keine ID für Artikel ${pos.artikel.name} gefunden`);
@@ -57,11 +70,6 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
           if (versandteMenge < 0 || versandteMenge > pos.menge) {
             throw new Error(`Ungültige Menge für Artikel ${pos.artikel.name}`);
           }
-
-          console.log('Updating bestellung_artikel:', {
-            id: pos.id,
-            versandteMenge
-          });
 
           const { error: updateError } = await supabase
             .from('bestellung_artikel')
@@ -83,7 +91,6 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
         .update({ 
           status: versandTyp === 'vollstaendig' ? 'versendet' : 'teilweise_versendet',
           versand_datum: new Date().toISOString(),
-          versandte_mengen: zuVerwendeneMengen,
           versender_id: user?.id
         })
         .eq('id', bestellung.id)
@@ -93,7 +100,7 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
             name,
             verantwortliche
           ),
-          artikel:bestellung_artikel (
+          bestellung_artikel (
             artikel:artikel_id (
               name,
               artikelnummer
@@ -111,9 +118,13 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
         for (const verantwortlicher of updatedBestellung.standort.verantwortliche) {
           await sendBestellungVersendetEmail({
             ...updatedBestellung,
+            artikel: updatedBestellung.bestellung_artikel.map(pos => ({
+              ...pos,
+              versandte_menge: zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.versandte_menge || 0
+            })),
             standort: {
               ...updatedBestellung.standort,
-              verantwortlicher: verantwortlicher
+              verantwortlicher
             }
           });
         }
@@ -122,9 +133,7 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
       return updatedBestellung;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['bestellungen']
-      });
+      queryClient.invalidateQueries({ queryKey: ['bestellungen'] });
       toast.success(
         versandTyp === 'vollstaendig' 
           ? 'Bestellung als versendet markiert' 
@@ -213,7 +222,7 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {bestellung.artikel.map((pos) => (
+                            {bestellung.bestellung_artikel.map((pos) => (
                               <tr key={pos.id}>
                                 <td className="whitespace-nowrap py-4 pl-3 text-sm">
                                   {pos.artikel.name}

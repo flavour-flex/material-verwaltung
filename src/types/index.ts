@@ -61,10 +61,13 @@ export interface BestellungType {
   versender_id?: string;
   versand_datum?: string;
   eingetroffen_datum?: string;
-  artikel: {
+  bestellung_artikel: {
     id: string;
     menge: number;
-    artikel: Artikel;
+    versandte_menge: number;
+    artikel: {
+      name: string;
+    };
   }[];
   standort?: {
     name: string;

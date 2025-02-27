@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
+import { sendBestellungEmail } from '@/lib/email';
 import type { 
   BestellPosition, 
   Artikel, 
@@ -133,6 +134,22 @@ export default function BestellungForm({ standortId }: Props) {
     },
   });
 
+  // Standort-Daten laden
+  const { data: standort } = useQuery({
+    queryKey: ['standort', standortId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('standorte')
+        .select('name')
+        .eq('id', standortId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!standortId
+  });
+
   const { register, control, handleSubmit, formState: { errors } } = useForm<BestellungFormData>({
     resolver: zodResolver(bestellungSchema),
     defaultValues: {
@@ -174,6 +191,21 @@ export default function BestellungForm({ standortId }: Props) {
           .insert(bestellungArtikel);
 
         if (positionenError) throw positionenError;
+
+        // Email an das Hauptlager senden
+        if (einstellungen?.hauptlager_email) {
+          await sendBestellungEmail(einstellungen.hauptlager_email, {
+            standort: { name: standort?.name },
+            artikel: data.artikel.map(pos => ({
+              artikel: artikel?.find(a => a.id === pos.artikel_id),
+              menge: pos.menge
+            }))
+          });
+        } else {
+          console.error('Keine Hauptlager-Email konfiguriert');
+        }
+
+        return bestellung;
       } catch (error: any) {
         console.error('Detailed error:', error);
         throw error;
@@ -181,12 +213,12 @@ export default function BestellungForm({ standortId }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bestellungen'] });
-      toast.success('Bestellung erfolgreich erstellt');
+      toast.success('Bestellung wurde erstellt');
       router.push('/bestellungen');
     },
     onError: (error: any) => {
-      toast.error(`Fehler: ${error.message}`);
-      console.error('Mutation error:', error);
+      toast.error(error.message || 'Fehler beim Erstellen der Bestellung');
+      console.error('Create error:', error);
     }
   });
 

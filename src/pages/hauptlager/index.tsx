@@ -9,12 +9,13 @@ import { useState } from 'react';
 import { PrinterIcon } from '@heroicons/react/24/outline';
 import VersandDialog from '@/components/hauptlager/VersandDialog';
 import { Dialog } from '@headlessui/react';
+import type { BestellungType } from '@/types';
 
 export default function HauptlagerPage() {
   const queryClient = useQueryClient();
   const [selectedBestellung, setSelectedBestellung] = useState<string | null>(null);
   const [showVersandDialog, setShowVersandDialog] = useState(false);
-  const [activeBestellung, setActiveBestellung] = useState<any>(null);
+  const [selectedVersandBestellung, setSelectedVersandBestellung] = useState<BestellungType | null>(null);
   const [stornierungBestellung, setStornierungBestellung] = useState<string | null>(null);
 
   const { data: bestellungen, isLoading } = useQuery({
@@ -23,20 +24,27 @@ export default function HauptlagerPage() {
       const { data, error } = await supabase
         .from('bestellungen')
         .select(`
-          *,
-          standort:standort_id (name),
-          artikel:bestellung_artikel(
+          id,
+          status,
+          created_at,
+          standort:standort_id (
+            name,
+            verantwortliche
+          ),
+          bestellung_artikel (
             id,
-            artikel_id,
             menge,
-            artikel:artikel_id(
+            versandte_menge,
+            artikel:artikel_id (
+              id,
               name,
               artikelnummer
             )
           )
         `)
-        .order('created_at', { ascending: false });
-      
+        .in('status', ['offen', 'teilweise_versendet'])
+        .order('created_at');
+
       if (error) throw error;
       return data;
     },
@@ -110,11 +118,11 @@ export default function HauptlagerPage() {
               </tr>
             </thead>
             <tbody>
-              ${bestellung.artikel.map((pos: any) => `
+              ${bestellung.bestellung_artikel.map((pos: any) => `
                 <tr>
                   <td>${pos.artikel.name}</td>
                   <td>${pos.artikel.artikelnummer}</td>
-                  <td>${pos.menge}</td>
+                  <td>${pos.versandte_menge} / ${pos.menge}</td>
                   <td style="width: 100px;">□</td>
                 </tr>
               `).join('')}
@@ -191,10 +199,10 @@ export default function HauptlagerPage() {
                 {bestellungen?.map((bestellung) => (
                   <tr key={bestellung.id}>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {format(new Date(bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
+                      {format(new Date(bestellung.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {bestellung.standort.name}
+                      {bestellung.standort?.name}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
                       <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
@@ -208,19 +216,25 @@ export default function HauptlagerPage() {
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500">
                       <button
-                        onClick={() => setSelectedBestellung(
-                          selectedBestellung === bestellung.id ? null : bestellung.id
-                        )}
+                        onClick={() => setSelectedBestellung(selectedBestellung === bestellung.id ? null : bestellung.id)}
                         className="text-indigo-600 hover:text-indigo-900"
                       >
-                        {bestellung.artikel.length} Artikel anzeigen
+                        {bestellung.bestellung_artikel.length} Artikel anzeigen
                       </button>
                       {selectedBestellung === bestellung.id && (
                         <div className="mt-2">
-                          <ul className="list-disc pl-5 space-y-1">
-                            {bestellung.artikel.map((pos: any, idx: number) => (
-                              <li key={idx}>
-                                {pos.menge}x {pos.artikel.name} ({pos.artikel.artikelnummer})
+                          <ul className="divide-y divide-gray-200">
+                            {bestellung.bestellung_artikel.map((position) => (
+                              <li key={position.id} className="py-2">
+                                <div className="flex justify-between">
+                                  <div>
+                                    <p className="font-medium">{position.artikel.name}</p>
+                                    <p className="text-sm text-gray-500">Art.Nr.: {position.artikel.artikelnummer}</p>
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {position.versandte_menge} / {position.menge} versandt
+                                  </div>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -240,12 +254,12 @@ export default function HauptlagerPage() {
                           <>
                             <button
                               onClick={() => {
-                                setActiveBestellung(bestellung);
+                                setSelectedVersandBestellung(bestellung);
                                 setShowVersandDialog(true);
                               }}
                               className="text-indigo-600 hover:text-indigo-900"
                             >
-                              Als versendet markieren
+                              Versenden
                             </button>
                             <button
                               onClick={() => setStornierungBestellung(bestellung.id)}
@@ -265,14 +279,14 @@ export default function HauptlagerPage() {
         </div>
       </div>
       
-      {showVersandDialog && activeBestellung && (
+      {showVersandDialog && selectedVersandBestellung && (
         <VersandDialog
           isOpen={showVersandDialog}
           onClose={() => {
             setShowVersandDialog(false);
-            setActiveBestellung(null);
+            setSelectedVersandBestellung(null);
           }}
-          bestellung={activeBestellung}
+          bestellung={selectedVersandBestellung}
         />
       )}
 
