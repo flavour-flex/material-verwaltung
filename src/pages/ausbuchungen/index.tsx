@@ -10,34 +10,7 @@ import { PrinterIcon } from '@heroicons/react/24/outline';
 import AusbuchungStatistiken from '@/components/ausbuchungen/AusbuchungStatistiken';
 import AusbuchungDruck from '@/components/ausbuchungen/AusbuchungDruck';
 import { createRoot } from 'react-dom/client';
-
-interface Ausbuchung {
-  id: string;
-  standort_id: string;
-  artikel_id: string;
-  menge: number;
-  lagerort: string;
-  referenz: string;
-  created_at: string;
-  storniert: boolean;
-  standort: {
-    name: string;
-  };
-  artikel: {
-    name: string;
-    artikelnummer: string;
-    einheit: string;
-  };
-}
-
-interface AusbuchungGruppe {
-  referenz: string;
-  created_at: string;
-  standort: {
-    name: string;
-  };
-  positionen: Ausbuchung[];
-}
+import { Ausbuchung, AusbuchungGruppe } from '@/types';
 
 export default function AusbuchungenPage() {
   const queryClient = useQueryClient();
