@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { Artikel, HardwareArtikel } from '@/types';
+import type { Artikel as ArtikelType, HardwareArtikel } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -28,41 +28,27 @@ const artikelSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich'),
   artikelnummer: z.string().min(1, 'Artikelnummer ist erforderlich'),
   beschreibung: z.string().optional(),
-  kategorie: z.enum(KATEGORIEN),
+  kategorie: z.enum(['Verbrauchsmaterial', 'Büromaterial', 'Hardware']),
   einheit: z.string().min(1, 'Einheit ist erforderlich'),
+  mindestbestand: z.number().optional(),
   serviceintervall_monate: z.number().nullable(),
   wechselintervall_jahre: z.number().nullable(),
   standort_id: z.string().nullable(),
   verantwortlicher: z.object({
-    name: z.string().min(1, 'Name ist erforderlich'),
-    email: z.string().email('Gültige E-Mail-Adresse erforderlich'),
-    telefon: z.string().min(1, 'Telefon ist erforderlich'),
-  }).nullable(),
-}).refine((data) => {
-  if (data.kategorie === 'Hardware') {
-    return (
-      data.serviceintervall_monate !== null &&
-      data.serviceintervall_monate > 0 &&
-      data.wechselintervall_jahre !== null &&
-      data.wechselintervall_jahre > 0 &&
-      data.standort_id !== null &&
-      data.verantwortlicher !== null
-    );
-  }
-  return true;
-}, {
-  message: "Für Hardware-Artikel müssen alle Felder ausgefüllt werden",
-  path: ["kategorie"], // Zeigt die Fehlermeldung bei der Kategorie an
+    name: z.string(),
+    email: z.string().email(),
+    telefon: z.string()
+  }).nullable()
 });
 
 type ArtikelFormData = z.infer<typeof artikelSchema>;
 
-interface ArtikelFormProps {
-  initialData?: Partial<HardwareArtikel>;
-  onSubmit: (data: any) => void;
+interface Props {
+  onSubmit: (data: ArtikelFormData) => void;
+  initialData?: ArtikelType;
 }
 
-export default function ArtikelForm({ initialData, onSubmit }: ArtikelFormProps) {
+export default function ArtikelForm({ onSubmit, initialData }: Props) {
   const {
     register,
     handleSubmit,
@@ -76,6 +62,7 @@ export default function ArtikelForm({ initialData, onSubmit }: ArtikelFormProps)
       beschreibung: initialData?.beschreibung || '',
       kategorie: (initialData?.kategorie as Kategorie) || 'Verbrauchsmaterial',
       einheit: initialData?.einheit || '',
+      mindestbestand: initialData?.mindestbestand || undefined,
       serviceintervall_monate: initialData?.serviceintervall_monate || null,
       wechselintervall_jahre: initialData?.wechselintervall_jahre || null,
       standort_id: initialData?.standort_id || null,
