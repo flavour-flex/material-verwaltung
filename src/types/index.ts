@@ -20,20 +20,29 @@ export interface Artikel {
   name: string;
   artikelnummer: string;
   beschreibung?: string;
-  kategorie: string;
+  kategorie: 'Verbrauchsmaterial' | 'Büromaterial' | 'Hardware';
   einheit: string;
+  mindestbestand?: number;
   created_at?: string;
   serviceintervall_monate?: number | null;
   wechselintervall_jahre?: number | null;
   standort_id?: string | null;
-  verantwortlicher?: Verantwortlicher | null;
+  verantwortlicher?: {
+    name: string;
+    email: string;
+    telefon: string;
+  } | null;
 }
 
 export interface HardwareArtikel extends Artikel {
-  serviceintervall_monate: number | null;
-  wechselintervall_jahre: number | null;
-  standort_id: string | null;
-  verantwortlicher: Verantwortlicher | null;
+  serviceintervall_monate: number;
+  wechselintervall_jahre: number;
+  standort_id: string;
+  verantwortlicher: {
+    name: string;
+    email: string;
+    telefon: string;
+  };
 }
 
 export interface BestellPosition {
