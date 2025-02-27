@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast';
 import { PrinterIcon } from '@heroicons/react/24/outline';
 import AusbuchungStatistiken from '@/components/ausbuchungen/AusbuchungStatistiken';
 import AusbuchungDruck from '@/components/ausbuchungen/AusbuchungDruck';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 interface Ausbuchung {
   id: string;
@@ -155,19 +155,25 @@ export default function AusbuchungenPage() {
           <link href="/styles/print.css" rel="stylesheet">
         </head>
         <body>
+          <div id="print-root"></div>
+        </body>
+      </html>
     `);
     
-    const printContent = document.createElement('div');
-    const druckKomponente = <AusbuchungDruck gruppe={gruppe} />;
-    ReactDOM.render(druckKomponente, printContent);
+    const printContainer = printWindow.document.getElementById('print-root');
+    if (!printContainer) return;
+
+    const root = createRoot(printContainer);
+    root.render(<AusbuchungDruck gruppe={gruppe} />);
     
-    printWindow.document.body.appendChild(printContent);
-    printWindow.document.write('</body></html>');
     printWindow.document.close();
     
     printWindow.onload = () => {
       printWindow.print();
-      printWindow.onafterprint = () => printWindow.close();
+      printWindow.onafterprint = () => {
+        root.unmount();
+        printWindow.close();
+      };
     };
   };
 
