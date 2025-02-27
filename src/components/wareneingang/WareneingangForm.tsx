@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { Bestellung, WareneingangPosition } from '@/types';
+import type { BestellungType, WareneingangPosition } from '@/types';
 
 const wareneingangSchema = z.object({
   artikel: z.array(z.object({
@@ -19,7 +19,7 @@ const wareneingangSchema = z.object({
 type WareneingangFormData = z.infer<typeof wareneingangSchema>;
 
 interface Props {
-  bestellung: Bestellung;
+  bestellung: BestellungType;
   onSubmit: (data: WareneingangFormData) => Promise<void>;
 }
 

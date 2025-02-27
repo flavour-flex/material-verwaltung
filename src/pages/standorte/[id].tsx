@@ -91,18 +91,16 @@ export default function StandortDetailPage() {
         `)
         .eq('standort_id', id);
 
-      console.log('Wareneingänge:', wareneingaenge); // Debug-Log
-
       if (wareneingangError) throw wareneingangError;
 
       // Warenbestand nach Artikel gruppieren
       const bestandMap = new Map();
 
       wareneingaenge?.forEach((eingang) => {
-        if (!eingang.artikel) return; // Überspringe Einträge ohne Artikel
+        if (!eingang.artikel) return;
 
-        const current = bestandMap.get(eingang.artikel.id) || {
-          id: eingang.id,
+        const artikelId = eingang.artikel.id;
+        const current = bestandMap.get(artikelId) || {
           artikel: eingang.artikel,
           menge: 0,
           lagerorte: [],
@@ -126,32 +124,33 @@ export default function StandortDetailPage() {
           });
         }
 
-        bestandMap.set(eingang.artikel.id, current);
+        bestandMap.set(artikelId, current);
       });
 
       // Konvertiere Map zu Array und filtere nach Kategorie
       const alleArtikel = Array.from(bestandMap.values());
       
-      // Log vor dem Return
+      console.log('Alle Artikel vor Filterung:', alleArtikel);
+
+      const verbrauchsmaterial = alleArtikel.filter(
+        artikel => artikel.artikel?.kategorie === 'Verbrauchsmaterial'
+      );
+
+      const bueromaterial = alleArtikel.filter(
+        artikel => artikel.artikel?.kategorie === 'Büromaterial'
+      );
+
       console.log('Gefilterte Artikel:', {
-        verbrauchsmaterial: alleArtikel.filter(
-          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
-        ),
-        bueromaterial: alleArtikel.filter(
-          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
-        )
+        verbrauchsmaterial,
+        bueromaterial
       });
 
       return {
-        verbrauchsmaterial: alleArtikel.filter(
-          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
-        ),
-        bueromaterial: alleArtikel.filter(
-          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
-        )
+        verbrauchsmaterial,
+        bueromaterial
       };
     },
-    enabled: !!id, // Query nur ausführen, wenn id vorhanden ist
+    enabled: !!id,
   });
 
   if (standortError || hardwareError) {
@@ -346,8 +345,8 @@ export default function StandortDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {warenbestand?.verbrauchsmaterial.map((position) => (
-                  <tr key={position.id}>
+                {(warenbestand?.verbrauchsmaterial || []).map((position) => (
+                  <tr key={position.artikel.id}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.artikel.name}
                     </td>
@@ -398,8 +397,8 @@ export default function StandortDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {warenbestand?.bueromaterial.map((position) => (
-                  <tr key={position.id}>
+                {(warenbestand?.bueromaterial || []).map((position) => (
+                  <tr key={position.artikel.id}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.artikel.name}
                     </td>

@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { Hardware, Standort } from '@/types';
+import type { HardwareArtikel, Standort } from '@/types';
 
 const hardwareSchema = z.object({
   artikel_id: z.string().min(1, 'Artikel ist erforderlich'),
@@ -13,20 +13,33 @@ const hardwareSchema = z.object({
   verantwortlicher: z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
     email: z.string().email('Gültige E-Mail erforderlich'),
+    telefon: z.string().min(1, 'Telefon ist erforderlich'),
   }),
 });
 
 type HardwareFormData = z.infer<typeof hardwareSchema>;
 
 interface Props {
-  initialData?: Hardware;
+  initialData?: HardwareArtikel;
   onSubmit: (data: HardwareFormData) => Promise<void>;
 }
 
 export default function HardwareForm({ initialData, onSubmit }: Props) {
+  const defaultValues = initialData ? {
+    artikel_id: initialData.id,
+    serviceintervall_monate: initialData.serviceintervall_monate || undefined,
+    wechselintervall_jahre: initialData.wechselintervall_jahre || undefined,
+    standort_id: initialData.standort_id || undefined,
+    verantwortlicher: initialData.verantwortlicher ? {
+      name: initialData.verantwortlicher.name,
+      email: initialData.verantwortlicher.email,
+      telefon: initialData.verantwortlicher.telefon,
+    } : undefined
+  } : {};
+
   const { register, handleSubmit, formState: { errors } } = useForm<HardwareFormData>({
     resolver: zodResolver(hardwareSchema),
-    defaultValues: initialData
+    defaultValues
   });
 
   const { data: standorte } = useQuery<Standort[]>({
@@ -138,6 +151,18 @@ export default function HardwareForm({ initialData, onSubmit }: Props) {
         />
         {errors.verantwortlicher?.email && (
           <p className="mt-1 text-sm text-red-600">{errors.verantwortlicher.email.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Verantwortlicher Telefon</label>
+        <input
+          type="text"
+          {...register('verantwortlicher.telefon')}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
+        {errors.verantwortlicher?.telefon && (
+          <p className="mt-1 text-sm text-red-600">{errors.verantwortlicher.telefon.message}</p>
         )}
       </div>
 

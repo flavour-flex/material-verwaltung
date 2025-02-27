@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { Artikel } from '@/types';
+import type { Artikel, HardwareArtikel } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -11,7 +11,9 @@ const KATEGORIEN = [
   'Verbrauchsmaterial',
   'Büromaterial',
   'Sonstiges',
-];
+] as const;
+
+type Kategorie = typeof KATEGORIEN[number];
 
 const EINHEITEN = [
   'Stück',
@@ -26,16 +28,10 @@ const artikelSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich'),
   artikelnummer: z.string().min(1, 'Artikelnummer ist erforderlich'),
   beschreibung: z.string().optional(),
-  kategorie: z.string().min(1, 'Kategorie ist erforderlich'),
+  kategorie: z.enum(KATEGORIEN),
   einheit: z.string().min(1, 'Einheit ist erforderlich'),
-  serviceintervall_monate: z.preprocess(
-    (val) => (val === '' ? null : Number(val)),
-    z.number().nullable()
-  ),
-  wechselintervall_jahre: z.preprocess(
-    (val) => (val === '' ? null : Number(val)),
-    z.number().nullable()
-  ),
+  serviceintervall_monate: z.number().nullable(),
+  wechselintervall_jahre: z.number().nullable(),
   standort_id: z.string().nullable(),
   verantwortlicher: z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
@@ -62,8 +58,8 @@ const artikelSchema = z.object({
 type ArtikelFormData = z.infer<typeof artikelSchema>;
 
 interface ArtikelFormProps {
-  initialData?: Partial<Artikel>;
-  onSubmit: (data: ArtikelFormData) => Promise<void>;
+  initialData?: Partial<HardwareArtikel>;
+  onSubmit: (data: any) => void;
 }
 
 export default function ArtikelForm({ initialData, onSubmit }: ArtikelFormProps) {
@@ -78,7 +74,7 @@ export default function ArtikelForm({ initialData, onSubmit }: ArtikelFormProps)
       name: initialData?.name || '',
       artikelnummer: initialData?.artikelnummer || '',
       beschreibung: initialData?.beschreibung || '',
-      kategorie: initialData?.kategorie || '',
+      kategorie: (initialData?.kategorie as Kategorie) || 'Verbrauchsmaterial',
       einheit: initialData?.einheit || '',
       serviceintervall_monate: initialData?.serviceintervall_monate || null,
       wechselintervall_jahre: initialData?.wechselintervall_jahre || null,

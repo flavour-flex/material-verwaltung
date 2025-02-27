@@ -1,11 +1,17 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
-import type { Artikel } from '@/types';
+import type { 
+  BestellPosition, 
+  Artikel, 
+  WareneingangData, 
+  BestandsArtikel,
+  LagerortPosition 
+} from '@/types';
 
 const bestellungSchema = z.object({
   artikel: z.array(z.object({
@@ -20,52 +26,88 @@ interface Props {
   standortId: string;
 }
 
+interface SupabaseWareneingang {
+  id: string;
+  artikel: {
+    id: string;
+    name: string;
+    artikelnummer: string;
+    kategorie: string;
+  };
+  menge: number;
+  lagerorte: LagerortPosition[];
+  bestellung?: {
+    id: string;
+    created_at: string;
+  };
+}
+
 export default function BestellungForm({ standortId }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const bestand = new Map<string, BestandsArtikel>();
   
-  // Aktuellen Warenbestand laden
-  const { data: warenbestand } = useQuery({
+  // Warenbestand laden
+  const { data: wareneingaenge } = useQuery<WareneingangData[]>({
     queryKey: ['standort-warenbestand', standortId],
     queryFn: async () => {
-      // Erst alle Wareneingänge für den Standort laden
-      const { data: wareneingaenge, error: wareneingangError } = await supabase
+      if (!standortId) return [];
+
+      const { data, error } = await supabase
         .from('wareneingang')
         .select(`
           id,
           artikel:artikel_id (
             id,
             name,
-            artikelnummer
+            artikelnummer,
+            kategorie
           ),
           menge,
-          lagerorte
+          lagerorte,
+          bestellung:bestellung_id (
+            id,
+            created_at
+          )
         `)
         .eq('standort_id', standortId);
 
-      if (wareneingangError) throw wareneingangError;
+      if (error) throw error;
 
-      // Warenbestand aggregieren
-      const bestand = new Map();
-      
-      wareneingaenge?.forEach((eingang) => {
-        const current = bestand.get(eingang.artikel.id) || {
-          artikel: eingang.artikel,
-          menge: 0,
-          lagerorte: new Map(),
-        };
+      // Transformiere die Daten in das erwartete Format
+      const transformedData = (data as unknown as SupabaseWareneingang[]).map(item => ({
+        id: item.id,
+        artikel: item.artikel,
+        menge: item.menge,
+        lagerorte: item.lagerorte,
+        bestellung: item.bestellung
+      }));
 
-        current.menge += eingang.menge;
-        
-        eingang.lagerorte?.forEach((lo: { lagerort: string, menge: number }) => {
-          const lagerortMenge = current.lagerorte.get(lo.lagerort) || 0;
-          current.lagerorte.set(lo.lagerort, lagerortMenge + lo.menge);
-        });
-
-        bestand.set(eingang.artikel.id, current);
-      });
-
-      return Array.from(bestand.values());
+      return transformedData;
     },
+  });
+
+  // Warenbestand berechnen
+  wareneingaenge?.forEach((eingang) => {
+    if (!eingang.artikel) return;
+
+    const current = bestand.get(eingang.artikel.id) || {
+      artikel: eingang.artikel,
+      menge: 0,
+      lagerorte: new Map<string, number>()
+    };
+
+    current.menge += eingang.menge;
+
+    // Lagerorte verarbeiten
+    if (Array.isArray(eingang.lagerorte)) {
+      eingang.lagerorte.forEach((lo) => {
+        const aktuellerBestand = current.lagerorte.get(lo.lagerort) || 0;
+        current.lagerorte.set(lo.lagerort, aktuellerBestand + lo.menge);
+      });
+    }
+
+    bestand.set(eingang.artikel.id, current);
   });
 
   // Alle verfügbaren Artikel laden
@@ -112,71 +154,22 @@ export default function BestellungForm({ standortId }: Props) {
   const createBestellung = useMutation({
     mutationFn: async (data: BestellungFormData) => {
       try {
-        // Erst die Bestellung erstellen
-        const { data: bestellung, error: bestellungError } = await supabase
+        const { error } = await supabase
           .from('bestellungen')
           .insert({
             standort_id: standortId,
+            artikel: data.artikel,
             status: 'offen'
-          })
-          .select('*, standort:standort_id(*)')
-          .single();
+          });
 
-        if (bestellungError) throw bestellungError;
-
-        // Artikel-Details laden
-        const { data: artikelDetails, error: artikelError } = await supabase
-          .from('artikel')
-          .select('id, name, artikelnummer')
-          .in('id', data.artikel.map(a => a.artikel_id));
-
-        if (artikelError) throw artikelError;
-
-        // Dann die Artikel der Bestellung hinzufügen
-        const { error: positionenError } = await supabase
-          .from('bestellung_artikel')
-          .insert(
-            data.artikel.map(pos => ({
-              bestellung_id: bestellung.id,
-              artikel_id: pos.artikel_id,
-              menge: pos.menge
-            }))
-          );
-
-        if (positionenError) throw positionenError;
-
-        // E-Mail mit vollständigen Artikel-Details senden
-        const bestellungMitArtikeln = {
-          ...bestellung,
-          artikel: data.artikel.map(pos => ({
-            ...pos,
-            artikel: artikelDetails.find(a => a.id === pos.artikel_id)
-          }))
-        };
-
-        const response = await fetch('/api/email/send-bestellung', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            bestellung: bestellungMitArtikeln
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Email error details:', errorData);
-          throw new Error(errorData.details || 'Failed to send email');
-        }
-
-        return bestellung;
+        if (error) throw error;
       } catch (error: any) {
         console.error('Detailed error:', error);
         throw error;
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bestellungen'] });
       toast.success('Bestellung erfolgreich erstellt');
       router.push('/bestellungen');
     },
@@ -186,8 +179,12 @@ export default function BestellungForm({ standortId }: Props) {
     }
   });
 
+  const onSubmit = handleSubmit((data: BestellungFormData) => {
+    return createBestellung.mutateAsync(data);
+  });
+
   return (
-    <form onSubmit={handleSubmit(createBestellung.mutateAsync)} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6">
       {/* Aktueller Warenbestand */}
       <div className="bg-white shadow sm:rounded-lg mb-8">
         <div className="px-4 py-5 sm:p-6">
@@ -205,7 +202,7 @@ export default function BestellungForm({ standortId }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {warenbestand?.map((artikel) => (
+                {Array.from(bestand.values()).map((artikel) => (
                   <tr key={artikel.artikel.id}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                       {artikel.artikel.name}
@@ -226,7 +223,7 @@ export default function BestellungForm({ standortId }: Props) {
                     </td>
                   </tr>
                 ))}
-                {(!warenbestand || warenbestand.length === 0) && (
+                {(!wareneingaenge || wareneingaenge.length === 0) && (
                   <tr>
                     <td colSpan={4} className="px-6 py-4 text-sm text-gray-500 text-center">
                       Kein Warenbestand vorhanden
@@ -308,10 +305,10 @@ export default function BestellungForm({ standortId }: Props) {
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={createBestellung.isLoading}
+          disabled={createBestellung.isPending}
           className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
-          {createBestellung.isLoading ? 'Wird erstellt...' : 'Bestellung aufgeben'}
+          {createBestellung.isPending ? 'Wird erstellt...' : 'Bestellung aufgeben'}
         </button>
       </div>
     </form>

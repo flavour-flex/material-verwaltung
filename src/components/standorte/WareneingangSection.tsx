@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Bestellung, Artikel } from '@/types';
+import type { 
+  BestellungType,  // Umbenennung von Bestellung zu BestellungType
+  Artikel, 
+  BestandsArtikel, 
+  WareneingangData 
+} from '@/types';
 import { AutoComplete } from '@/components/ui/AutoComplete';
 import { toast } from 'react-hot-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { 
+  transformWareneingang, 
+  transformBestellung, 
+  transformToBestandsArtikel 
+} from '@/lib/transformers';
 
 interface WareneingangSectionProps {
   standortId: string;
@@ -37,11 +47,66 @@ interface Bestellung {
 }
 
 export default function WareneingangSection({ standortId, onWareneingangComplete }: WareneingangSectionProps) {
-  const [pendingOrders, setPendingOrders] = useState<Bestellung[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Bestellung | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<BestellungType[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<BestellungType | null>(null);
   const [locations, setLocations] = useState<string[]>([]);
   const [items, setItems] = useState<WareneingangItem[]>([]);
   const queryClient = useQueryClient();
+  const bestand = new Map<string, BestandsArtikel>();
+
+  const { data: wareneingaenge = [] } = useQuery<WareneingangData[]>({
+    queryKey: ['standort-warenbestand', standortId],
+    queryFn: async () => {
+      if (!standortId) return [];
+
+      const { data, error } = await supabase
+        .from('wareneingang')
+        .select(`
+          id,
+          artikel:artikel_id (
+            id,
+            name,
+            artikelnummer,
+            kategorie
+          ),
+          menge,
+          lagerorte,
+          bestellung:bestellung_id (
+            id,
+            created_at
+          )
+        `)
+        .eq('standort_id', standortId);
+
+      if (error) throw error;
+      return (data || []).map(transformWareneingang);
+    },
+  });
+
+  // Warenbestand berechnen
+  if (Array.isArray(wareneingaenge)) {
+    wareneingaenge.forEach((eingang) => {
+      if (!eingang?.artikel) return;
+
+      const current = bestand.get(eingang.artikel.id) || {
+        artikel: eingang.artikel,
+        menge: 0,
+        lagerorte: new Map<string, number>()
+      };
+
+      current.menge += eingang.menge;
+
+      // Lagerorte verarbeiten
+      if (Array.isArray(eingang.lagerorte)) {
+        eingang.lagerorte.forEach((lo) => {
+          const aktuellerBestand = current.lagerorte.get(lo.lagerort) || 0;
+          current.lagerorte.set(lo.lagerort, aktuellerBestand + lo.menge);
+        });
+      }
+
+      bestand.set(eingang.artikel.id, current);
+    });
+  }
 
   // Lade versendete Bestellungen
   useEffect(() => {
@@ -65,14 +130,7 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
       console.log('Fetched orders:', data, 'Error:', error);
 
       if (!error && data) {
-        // Bei Teillieferungen nur die versendeten Mengen anzeigen
-        const processedOrders = data.map(order => ({
-          ...order,
-          artikel: order.artikel.map(pos => ({
-            ...pos,
-            menge: order.status === 'teilweise_versendet' ? pos.versandte_menge : pos.menge
-          }))
-        }));
+        const processedOrders = data.map(transformBestellung);
         setPendingOrders(processedOrders);
       } else {
         console.error('Error fetching orders:', error);
@@ -94,7 +152,7 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
     fetchLocations();
   }, [standortId]);
 
-  const handleOrderSelect = (order: Bestellung) => {
+  const handleOrderSelect = (order: BestellungType) => {
     setSelectedOrder(order);
     setItems(
       order.artikel.map(pos => ({

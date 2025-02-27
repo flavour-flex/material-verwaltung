@@ -4,14 +4,15 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { BestandsArtikel } from '@/types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   standortId: string;
   warenbestand: {
-    verbrauchsmaterial: any[];
-    bueromaterial: any[];
+    verbrauchsmaterial: BestandsArtikel[];
+    bueromaterial: BestandsArtikel[];
   };
   onSuccess: () => void;
 }
@@ -25,8 +26,8 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
   // Kombiniere alle Artikel aus beiden Kategorien
   const alleArtikel = [...(warenbestand.verbrauchsmaterial || []), ...(warenbestand.bueromaterial || [])];
   
-  const artikel = alleArtikel.find(a => a.artikel.id === selectedArtikel);
-  const verfuegbareMenge = artikel?.lagerorte.find(l => l.lagerort === selectedLagerort)?.menge || 0;
+  const artikel = alleArtikel.find(a => a.artikel.id === selectedArtikel) as BestandsArtikel | undefined;
+  const verfuegbareMenge = artikel?.lagerorte.get(selectedLagerort) || 0;
 
   const queryClient = useQueryClient();
 
@@ -66,6 +67,11 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
     setReferenz('');
   };
 
+  // Konvertiere Map-Entries zu Array mit expliziten Typen
+  const lagerorteEntries: [string, number][] = artikel 
+    ? Array.from(artikel.lagerorte.entries())
+    : [];
+
   return (
     <Transition.Root show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -99,14 +105,17 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
 
                       {selectedArtikel && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">Lagerort</label>
+                          <label htmlFor="lagerort" className="block text-sm font-medium text-gray-700">
+                            Lagerort
+                          </label>
                           <select
+                            id="lagerort"
                             value={selectedLagerort}
                             onChange={(e) => setSelectedLagerort(e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                           >
                             <option value="">Bitte wählen</option>
-                            {Array.from(artikel?.lagerorte.entries() || []).map(([lagerort, menge]) => (
+                            {lagerorteEntries.map(([lagerort, menge]) => (
                               <option key={lagerort} value={lagerort}>
                                 {lagerort} ({menge} verfügbar)
                               </option>
@@ -150,7 +159,7 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
                   type="button"
                   className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 sm:col-start-2"
                   onClick={() => ausbuchen.mutate()}
-                  disabled={!selectedArtikel || !selectedLagerort || !referenz || ausbuchen.isLoading}
+                  disabled={!selectedArtikel || !selectedLagerort || !referenz || ausbuchen.isPending}
                 >
                   Ausbuchen
                 </button>

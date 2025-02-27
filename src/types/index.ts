@@ -19,16 +19,21 @@ export interface Artikel {
   id: string;
   name: string;
   artikelnummer: string;
-  beschreibung: string;
+  beschreibung?: string;
   kategorie: string;
   einheit: string;
+  created_at?: string;
+  serviceintervall_monate?: number | null;
+  wechselintervall_jahre?: number | null;
+  standort_id?: string | null;
+  verantwortlicher?: Verantwortlicher | null;
 }
 
-export interface Hardware extends Artikel {
-  serviceintervall_monate: number;
-  wechselintervall_jahre: number;
-  standort_id: string;
-  verantwortlicher: Verantwortlicher;
+export interface HardwareArtikel extends Artikel {
+  serviceintervall_monate: number | null;
+  wechselintervall_jahre: number | null;
+  standort_id: string | null;
+  verantwortlicher: Verantwortlicher | null;
 }
 
 export interface BestellPosition {
@@ -38,7 +43,7 @@ export interface BestellPosition {
 
 export type BestellungStatus = 'offen' | 'versendet' | 'eingetroffen' | 'storniert';
 
-export interface Bestellung {
+export interface BestellungType {
   id: string;
   standort_id: string;
   status: BestellungStatus;
@@ -82,4 +87,31 @@ export interface Wareneingang {
   bestellung_id: string;
   artikel: WareneingangPosition[];
   eingebucht_am: string;
+}
+
+export interface WareneingangData {
+  id: string;
+  artikel: {
+    id: string;
+    name: string;
+    artikelnummer: string;
+    kategorie: string;
+  };
+  menge: number;
+  lagerorte: LagerortPosition[];
+  bestellung?: {
+    id: string;
+    created_at: string;
+  };
+}
+
+export interface BestandsArtikel {
+  artikel: {
+    id: string;
+    name: string;
+    artikelnummer: string;
+    kategorie: string;
+  };
+  menge: number;
+  lagerorte: Map<string, number>;
 } 

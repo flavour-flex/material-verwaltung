@@ -76,14 +76,17 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
         .update({ 
           status: versandTyp === 'vollstaendig' ? 'versendet' : 'teilweise_versendet',
           versand_datum: new Date().toISOString(),
-          versandte_mengen: zuVerwendeneMengen
+          versandte_mengen: zuVerwendeneMengen,
+          versender_id: user?.id
         })
         .eq('id', bestellung.id);
 
       if (bestellungError) throw bestellungError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['bestellungen']);
+      queryClient.invalidateQueries({ 
+        queryKey: ['bestellungen']
+      });
       toast.success(
         versandTyp === 'vollstaendig' 
           ? 'Bestellung als versendet markiert' 
