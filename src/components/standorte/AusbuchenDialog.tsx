@@ -9,7 +9,10 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   standortId: string;
-  warenbestand: any[];
+  warenbestand: {
+    verbrauchsmaterial: any[];
+    bueromaterial: any[];
+  };
   onSuccess: () => void;
 }
 
@@ -19,66 +22,40 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
   const [menge, setMenge] = useState(1);
   const [referenz, setReferenz] = useState('');
 
-  const artikel = warenbestand.find(a => a.artikel.id === selectedArtikel);
-  const verfuegbareMenge = artikel?.lagerorte.get(selectedLagerort) || 0;
+  // Kombiniere alle Artikel aus beiden Kategorien
+  const alleArtikel = [...(warenbestand.verbrauchsmaterial || []), ...(warenbestand.bueromaterial || [])];
+  
+  const artikel = alleArtikel.find(a => a.artikel.id === selectedArtikel);
+  const verfuegbareMenge = artikel?.lagerorte.find(l => l.lagerort === selectedLagerort)?.menge || 0;
 
   const queryClient = useQueryClient();
 
   const ausbuchen = useMutation({
     mutationFn: async () => {
-      if (!selectedArtikel || !selectedLagerort || !referenz) {
-        throw new Error('Bitte alle Felder ausfüllen');
-      }
+      if (!artikel) throw new Error('Kein Artikel ausgewählt');
+      if (!selectedLagerort) throw new Error('Kein Lagerort ausgewählt');
+      if (menge <= 0) throw new Error('Ungültige Menge');
+      if (menge > verfuegbareMenge) throw new Error('Nicht genügend Bestand');
 
-      if (menge > verfuegbareMenge) {
-        throw new Error('Nicht genügend Artikel im Lagerort verfügbar');
-      }
-
-      // Transaktion starten
-      const { error: transactionError } = await supabase.rpc('ausbuchen_artikel', {
-        p_standort_id: standortId,
-        p_artikel_id: selectedArtikel,
-        p_menge: menge,
-        p_lagerort: selectedLagerort,
-        p_referenz: referenz
-      });
-
-      if (transactionError) throw transactionError;
-    },
-    onMutate: async () => {
-      // Optimistische Aktualisierung
-      const previousWarenbestand = queryClient.getQueryData(['standort-warenbestand', standortId]);
-      
-      queryClient.setQueryData(['standort-warenbestand', standortId], (old: any[]) => {
-        return old.map(artikel => {
-          if (artikel.artikel.id === selectedArtikel) {
-            const newLagerorte = new Map(artikel.lagerorte);
-            const currentMenge = newLagerorte.get(selectedLagerort) || 0;
-            newLagerorte.set(selectedLagerort, currentMenge - menge);
-            
-            return {
-              ...artikel,
-              menge: artikel.menge - menge,
-              lagerorte: newLagerorte
-            };
-          }
-          return artikel;
+      const { error } = await supabase
+        .from('ausgang')
+        .insert({
+          standort_id: standortId,
+          artikel_id: selectedArtikel,
+          menge,
+          lagerort: selectedLagerort,
+          referenz
         });
-      });
 
-      return { previousWarenbestand };
-    },
-    onError: (error, variables, context) => {
-      // Bei Fehler zurückrollen
-      if (context?.previousWarenbestand) {
-        queryClient.setQueryData(['standort-warenbestand', standortId], context.previousWarenbestand);
-      }
-      toast.error(error.message || 'Fehler beim Ausbuchen');
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Artikel erfolgreich ausgebucht');
       onSuccess();
       resetForm();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Fehler beim Ausbuchen');
     }
   });
 
@@ -108,16 +85,13 @@ export default function AusbuchenDialog({ isOpen, onClose, standortId, warenbest
                         <label className="block text-sm font-medium text-gray-700">Artikel</label>
                         <select
                           value={selectedArtikel}
-                          onChange={(e) => {
-                            setSelectedArtikel(e.target.value);
-                            setSelectedLagerort('');
-                          }}
+                          onChange={(e) => setSelectedArtikel(e.target.value)}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         >
-                          <option value="">Bitte wählen</option>
-                          {warenbestand.map((artikel) => (
+                          <option value="">Artikel auswählen</option>
+                          {alleArtikel.map((artikel) => (
                             <option key={artikel.artikel.id} value={artikel.artikel.id}>
-                              {artikel.artikel.name} ({artikel.artikel.artikelnummer})
+                              {artikel.artikel.name} ({artikel.menge} verfügbar)
                             </option>
                           ))}
                         </select>

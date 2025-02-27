@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Bestellung, Artikel } from '@/types';
 import { AutoComplete } from '@/components/ui/AutoComplete';
 import { toast } from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface WareneingangSectionProps {
   standortId: string;
@@ -17,11 +18,30 @@ interface WareneingangItem extends Artikel {
   }[];
 }
 
+interface BestellungArtikel {
+  id: string;
+  artikel_id: string;
+  menge: number;
+  versandte_menge: number;
+  artikel: {
+    id: string;
+    name: string;
+    artikelnummer: string;
+  };
+}
+
+interface Bestellung {
+  id: string;
+  artikel: BestellungArtikel[];
+  // ... andere Felder
+}
+
 export default function WareneingangSection({ standortId, onWareneingangComplete }: WareneingangSectionProps) {
   const [pendingOrders, setPendingOrders] = useState<Bestellung[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Bestellung | null>(null);
   const [locations, setLocations] = useState<string[]>([]);
   const [items, setItems] = useState<WareneingangItem[]>([]);
+  const queryClient = useQueryClient();
 
   // Lade versendete Bestellungen
   useEffect(() => {
@@ -35,16 +55,25 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
           artikel:bestellung_artikel(
             id,
             menge,
+            versandte_menge,
             artikel:artikel_id(*)
           )
         `)
-        .eq('status', 'versendet')
-        .eq('standort_id', standortId);
+        .eq('standort_id', standortId)
+        .in('status', ['versendet', 'teilweise_versendet']);
 
       console.log('Fetched orders:', data, 'Error:', error);
 
       if (!error && data) {
-        setPendingOrders(data);
+        // Bei Teillieferungen nur die versendeten Mengen anzeigen
+        const processedOrders = data.map(order => ({
+          ...order,
+          artikel: order.artikel.map(pos => ({
+            ...pos,
+            menge: order.status === 'teilweise_versendet' ? pos.versandte_menge : pos.menge
+          }))
+        }));
+        setPendingOrders(processedOrders);
       } else {
         console.error('Error fetching orders:', error);
       }
@@ -67,21 +96,50 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
 
   const handleOrderSelect = (order: Bestellung) => {
     setSelectedOrder(order);
-    setItems(order.artikel.map(bestellungArtikel => ({
-      ...bestellungArtikel.artikel,
-      quantity: bestellungArtikel.menge,
-      splits: [{
-        quantity: bestellungArtikel.menge,
-        location: ''
-      }]
-    })));
+    setItems(
+      order.artikel.map(pos => ({
+        ...pos.artikel,
+        id: pos.artikel.id,        // Artikel ID
+        bestellung_artikel_id: pos.id,  // Bestellung_artikel ID
+        quantity: pos.menge,
+        splits: [
+          { 
+            location: '', 
+            quantity: pos.menge 
+          }
+        ]
+      }))
+    );
   };
 
-  const handleSplit = (itemIndex: number) => {
+  const handleSplitItem = (itemIndex: number) => {
     setItems(prev => {
       const newItems = [...prev];
       const item = newItems[itemIndex];
-      item.splits.push({ quantity: 0, location: '' });
+      
+      // Wenn bereits 2 Splits vorhanden sind (original + zusätzlich), nichts tun
+      if (item.splits.length >= 2) {
+        toast('Maximal zwei Lagerorte möglich', {
+          icon: 'ℹ️'
+        });
+        return prev;
+      }
+
+      // Aktuelle Menge des ersten Splits
+      const currentQuantity = item.splits[0].quantity;
+      
+      // Teile die Menge gleichmäßig auf
+      const halfQuantity = Math.floor(currentQuantity / 2);
+      
+      // Aktualisiere den ersten Split
+      item.splits[0].quantity = halfQuantity;
+      
+      // Füge einen neuen Split mit der restlichen Menge hinzu
+      item.splits.push({
+        location: '',
+        quantity: currentQuantity - halfQuantity // Rest der Menge
+      });
+      
       return newItems;
     });
   };
@@ -104,14 +162,33 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
     });
   };
 
+  // Validiere die Eingaben
+  const validateSplits = (item: WareneingangItem) => {
+    const totalSplit = item.splits.reduce((sum, split) => sum + (Number(split.quantity) || 0), 0);
+    return totalSplit === item.quantity;
+  };
+
   const handleEinbuchen = async () => {
     if (!selectedOrder) return;
 
     try {
-      // Validiere Mengen
+      // Validiere Mengen und Lagerorte
       for (const item of items) {
-        const totalSplit = item.splits.reduce((sum, split) => sum + split.quantity, 0);
-        if (totalSplit !== item.quantity) {
+        // Prüfe ob alle Splits gültige Werte haben
+        const hasInvalidSplits = item.splits.some(split => 
+          !split.location || 
+          typeof split.quantity !== 'number' || 
+          isNaN(split.quantity) || 
+          split.quantity <= 0
+        );
+
+        if (hasInvalidSplits) {
+          toast.error(`Bitte geben Sie gültige Mengen und Lagerorte für ${item.name} ein`);
+          return;
+        }
+
+        // Prüfe ob die Summe der Splits korrekt ist
+        if (!validateSplits(item)) {
           toast.error(`Die Summe der aufgeteilten Mengen muss der Gesamtmenge entsprechen bei ${item.name}`);
           return;
         }
@@ -123,9 +200,9 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
           const { error: wareneingangError } = await supabase
             .from('wareneingang')
             .insert({
-              bestellung_id: selectedOrder.id,
+              bestellung_id: selectedOrder.id,  // Bestellungs-ID
               standort_id: standortId,
-              artikel_id: item.id,
+              artikel_id: item.id,              // Artikel-ID
               menge: split.quantity,
               lagerorte: [{ 
                 lagerort: split.location, 
@@ -134,7 +211,11 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
             });
 
           if (wareneingangError) {
-            console.error('Wareneingang error:', wareneingangError);
+            console.error('Wareneingang error:', wareneingangError, {
+              bestellung_id: selectedOrder.id,
+              artikel_id: item.id,
+              menge: split.quantity
+            });
             throw wareneingangError;
           }
         }
@@ -148,18 +229,14 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
 
       if (bestellungError) throw bestellungError;
 
-      // Erfolgsmeldung
+      // Korrigiere die Query-Invalidierung
+      queryClient.invalidateQueries({ queryKey: ['bestellungen'] });
       toast.success('Wareneingang erfolgreich gebucht');
-      
-      // Aktualisiere die Liste der offenen Bestellungen
       setPendingOrders(prev => prev.filter(order => order.id !== selectedOrder.id));
-      
-      // Benachrichtige Parent über die Änderung
       onWareneingangComplete();
-      
-      // Reset lokaler State
       setSelectedOrder(null);
       setItems([]);
+
     } catch (error) {
       console.error('Einbuchen error:', error);
       toast.error('Fehler beim Einbuchen der Ware');
@@ -203,12 +280,21 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
           <h4 className="font-medium">Bestellung #{selectedOrder.id} einbuchen</h4>
           
           {items.map((item, itemIndex) => (
-            <div key={item.id} className="border p-4 rounded-md">
-              <div className="font-medium mb-2">{item.name}</div>
-              <div className="text-sm text-gray-500 mb-4">Gesamtmenge: {item.quantity}</div>
+            <div key={item.id} className="mb-4 p-4 border rounded">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-medium">{item.name}</h4>
+                <button
+                  type="button"
+                  onClick={() => handleSplitItem(itemIndex)}
+                  className="text-sm text-indigo-600 hover:text-indigo-900"
+                >
+                  Aufteilen
+                </button>
+              </div>
+              <p className="text-sm text-gray-500">Gesamtmenge: {item.quantity}</p>
               
               {item.splits.map((split, splitIndex) => (
-                <div key={splitIndex} className="flex gap-4 mb-2">
+                <div key={splitIndex} className="mt-2 flex gap-4">
                   <input
                     type="number"
                     value={split.quantity}
@@ -225,13 +311,6 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
                   />
                 </div>
               ))}
-              
-              <button
-                onClick={() => handleSplit(itemIndex)}
-                className="text-blue-500 text-sm mt-2"
-              >
-                Aufteilen
-              </button>
             </div>
           ))}
           

@@ -7,10 +7,15 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useState } from 'react';
 import { PrinterIcon } from '@heroicons/react/24/outline';
+import VersandDialog from '@/components/hauptlager/VersandDialog';
+import { Dialog } from '@headlessui/react';
 
 export default function HauptlagerPage() {
   const queryClient = useQueryClient();
   const [selectedBestellung, setSelectedBestellung] = useState<string | null>(null);
+  const [showVersandDialog, setShowVersandDialog] = useState(false);
+  const [activeBestellung, setActiveBestellung] = useState<any>(null);
+  const [stornierungBestellung, setStornierungBestellung] = useState<string | null>(null);
 
   const { data: bestellungen, isLoading } = useQuery({
     queryKey: ['bestellungen'],
@@ -21,6 +26,8 @@ export default function HauptlagerPage() {
           *,
           standort:standort_id (name),
           artikel:bestellung_artikel(
+            id,
+            artikel_id,
             menge,
             artikel:artikel_id(
               name,
@@ -39,14 +46,21 @@ export default function HauptlagerPage() {
     mutationFn: async ({ id, status }: { id: string, status: 'versendet' | 'eingetroffen' | 'storniert' }) => {
       const { error } = await supabase
         .from('bestellungen')
-        .update({ status })
+        .update({ 
+          status,
+          storniert_am: status === 'storniert' ? new Date().toISOString() : null 
+        })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
-      toast.success('Status aktualisiert');
       queryClient.invalidateQueries(['bestellungen']);
+      toast.success('Status erfolgreich aktualisiert');
+      setStornierungBestellung(null);
     },
     onError: (error) => {
       toast.error('Fehler beim Aktualisieren des Status');
@@ -111,6 +125,48 @@ export default function HauptlagerPage() {
     `);
     printWindow.document.close();
   };
+
+  // Stornierung-Dialog Komponente
+  const StornierungDialog = () => (
+    <Dialog
+      open={!!stornierungBestellung}
+      onClose={() => setStornierungBestellung(null)}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-sm rounded bg-white p-6">
+          <Dialog.Title className="text-lg font-medium mb-4">
+            Bestellung stornieren
+          </Dialog.Title>
+          <p className="mb-4">
+            Möchten Sie diese Bestellung wirklich stornieren? Diese Aktion kann nicht rückgängig gemacht werden.
+          </p>
+          <div className="flex justify-end gap-4">
+            <button
+              onClick={() => setStornierungBestellung(null)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => {
+                if (stornierungBestellung) {
+                  updateStatus.mutate({ 
+                    id: stornierungBestellung, 
+                    status: 'storniert' 
+                  });
+                }
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+            >
+              Stornieren
+            </button>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
+  );
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -183,19 +239,16 @@ export default function HauptlagerPage() {
                         {bestellung.status === 'offen' && (
                           <>
                             <button
-                              onClick={() => updateStatus.mutate({ 
-                                id: bestellung.id, 
-                                status: 'versendet' 
-                              })}
+                              onClick={() => {
+                                setActiveBestellung(bestellung);
+                                setShowVersandDialog(true);
+                              }}
                               className="text-indigo-600 hover:text-indigo-900"
                             >
                               Als versendet markieren
                             </button>
                             <button
-                              onClick={() => updateStatus.mutate({ 
-                                id: bestellung.id, 
-                                status: 'storniert' 
-                              })}
+                              onClick={() => setStornierungBestellung(bestellung.id)}
                               className="text-red-600 hover:text-red-900"
                             >
                               Stornieren
@@ -211,6 +264,19 @@ export default function HauptlagerPage() {
           </div>
         </div>
       </div>
+      
+      {showVersandDialog && activeBestellung && (
+        <VersandDialog
+          isOpen={showVersandDialog}
+          onClose={() => {
+            setShowVersandDialog(false);
+            setActiveBestellung(null);
+          }}
+          bestellung={activeBestellung}
+        />
+      )}
+
+      <StornierungDialog />
     </Layout>
   );
 } 

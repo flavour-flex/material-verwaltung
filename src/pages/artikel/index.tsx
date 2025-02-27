@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import Layout from '@/components/Layout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -27,7 +27,14 @@ interface HardwareArtikel extends Artikel {
   };
 }
 
+interface BueromaterialArtikel extends Artikel {
+  mindestbestand: number;
+  einheit: string;
+}
+
 export default function ArtikelPage() {
+  const queryClient = useQueryClient();
+
   const { data: hardware = [], isLoading: hardwareLoading } = useQuery<HardwareArtikel[]>({
     queryKey: ['artikel', 'hardware'],
     queryFn: async () => {
@@ -87,7 +94,24 @@ export default function ArtikelPage() {
     },
   });
 
-  if (hardwareLoading || verbrauchsmaterialLoading) return <LoadingSpinner />;
+  const { data: bueromaterial = [], isLoading: bueromaterialLoading } = useQuery<BueromaterialArtikel[]>({
+    queryKey: ['artikel', 'bueromaterial'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('artikel')
+        .select('*')
+        .eq('kategorie', 'Büromaterial')
+        .order('name');
+      
+      if (error) {
+        console.error('Fehler beim Laden des Büromaterials:', error);
+        throw error;
+      }
+      return data || [];
+    },
+  });
+
+  if (hardwareLoading || verbrauchsmaterialLoading || bueromaterialLoading) return <LoadingSpinner />;
 
   return (
     <Layout>
@@ -209,6 +233,63 @@ export default function ArtikelPage() {
                   <tr>
                     <td colSpan={5} className="px-6 py-4 text-sm text-gray-500 text-center">
                       Kein Verbrauchsmaterial vorhanden
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Büromaterial-Tabelle */}
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Büromaterial</h2>
+          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+            <table className="min-w-full divide-y divide-gray-300">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Artikelnummer</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Beschreibung</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Mindestbestand</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Einheit</th>
+                  <th className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                    <span className="sr-only">Bearbeiten</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {bueromaterial.map((artikel) => (
+                  <tr key={artikel.id}>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                      {artikel.name}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {artikel.artikelnummer}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {artikel.beschreibung}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500 text-right">
+                      {artikel.mindestbestand || 0} {artikel.einheit || 'Stück'}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {artikel.einheit || 'Stück'}
+                    </td>
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                      <Link
+                        href={`/artikel/${artikel.id}/bearbeiten`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Bearbeiten
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {bueromaterial.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 text-sm text-gray-500 text-center">
+                      Kein Büromaterial vorhanden
                     </td>
                   </tr>
                 )}

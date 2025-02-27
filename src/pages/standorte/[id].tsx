@@ -10,6 +10,8 @@ import type { Standort, Hardware, WareneingangPosition } from '@/types';
 import WareneingangSection from '@/components/standorte/WareneingangSection';
 import { useState } from 'react';
 import AusbuchenDialog from '@/components/standorte/AusbuchenDialog';
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 export default function StandortDetailPage() {
   const router = useRouter();
@@ -67,53 +69,89 @@ export default function StandortDetailPage() {
   const { data: warenbestand, isLoading: warenbestandLoading } = useQuery({
     queryKey: ['standort-warenbestand', id],
     queryFn: async () => {
+      if (!id) return { verbrauchsmaterial: [], bueromaterial: [] };
+
       const { data: wareneingaenge, error: wareneingangError } = await supabase
         .from('wareneingang')
         .select(`
           id,
-          artikel_id,
-          menge,
-          lagerorte,
           artikel:artikel_id (
             id,
             name,
-            artikelnummer
+            artikelnummer,
+            kategorie,
+            einheit
+          ),
+          menge,
+          lagerorte,
+          bestellung:bestellung_id (
+            id,
+            created_at
           )
         `)
         .eq('standort_id', id);
-      
-      if (wareneingangError) {
-        console.error('Wareneingang error:', wareneingangError);
-        throw wareneingangError;
-      }
 
       console.log('Wareneingänge:', wareneingaenge); // Debug-Log
 
-      // Warenbestand aggregieren
-      const bestand = new Map();
-      
+      if (wareneingangError) throw wareneingangError;
+
+      // Warenbestand nach Artikel gruppieren
+      const bestandMap = new Map();
+
       wareneingaenge?.forEach((eingang) => {
-        const current = bestand.get(eingang.artikel_id) || {
+        if (!eingang.artikel) return; // Überspringe Einträge ohne Artikel
+
+        const current = bestandMap.get(eingang.artikel.id) || {
+          id: eingang.id,
           artikel: eingang.artikel,
           menge: 0,
-          lagerorte: new Map(),
+          lagerorte: [],
+          bestellung: eingang.bestellung
         };
 
         current.menge += eingang.menge;
-        
+
+        // Lagerorte zusammenführen
         if (Array.isArray(eingang.lagerorte)) {
           eingang.lagerorte.forEach((lo: { lagerort: string, menge: number }) => {
-            const lagerortMenge = current.lagerorte.get(lo.lagerort) || 0;
-            current.lagerorte.set(lo.lagerort, lagerortMenge + lo.menge);
+            const existingLagerort = current.lagerorte.find(
+              (l: { lagerort: string }) => l.lagerort === lo.lagerort
+            );
+
+            if (existingLagerort) {
+              existingLagerort.menge += lo.menge;
+            } else {
+              current.lagerorte.push({ ...lo });
+            }
           });
         }
 
-        bestand.set(eingang.artikel_id, current);
+        bestandMap.set(eingang.artikel.id, current);
       });
 
-      return Array.from(bestand.values());
+      // Konvertiere Map zu Array und filtere nach Kategorie
+      const alleArtikel = Array.from(bestandMap.values());
+      
+      // Log vor dem Return
+      console.log('Gefilterte Artikel:', {
+        verbrauchsmaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
+        ),
+        bueromaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
+        )
+      });
+
+      return {
+        verbrauchsmaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
+        ),
+        bueromaterial: alleArtikel.filter(
+          artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
+        )
+      };
     },
-    enabled: !!id,
+    enabled: !!id, // Query nur ausführen, wenn id vorhanden ist
   });
 
   if (standortError || hardwareError) {
@@ -293,7 +331,10 @@ export default function StandortDetailPage() {
         <div className="px-4 py-5 sm:px-6">
           <h3 className="text-lg font-medium leading-6 text-gray-900">Warenbestand</h3>
         </div>
+        
+        {/* Verbrauchsmaterial */}
         <div className="border-t border-gray-200">
+          <h4 className="px-4 py-3 text-md font-medium">Verbrauchsmaterial</h4>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-300">
               <thead className="bg-gray-50">
@@ -305,31 +346,88 @@ export default function StandortDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {warenbestand?.map((artikel) => (
-                  <tr key={artikel.artikel.id}>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {artikel.artikel.name}
+                {warenbestand?.verbrauchsmaterial.map((position) => (
+                  <tr key={position.id}>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.artikel.name}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {artikel.artikel.artikelnummer}
+                      {position.artikel.artikelnummer}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500 text-right">
-                      {artikel.menge}
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.menge} {position.artikel.einheit || 'Stück'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {Array.from(artikel.lagerorte.entries()).map(([lagerort, menge]) => (
-                        <div key={lagerort} className="flex justify-between">
-                          <span>{lagerort}:</span>
-                          <span className="ml-2">{menge}</span>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.lagerorte?.map((lagerort, index) => (
+                        <div key={index} className="flex justify-between">
+                          <span>{lagerort.lagerort}:</span>
+                          <span className="ml-2">{lagerort.menge}</span>
                         </div>
                       ))}
+                      {position.bestellung && (
+                        <div className="text-indigo-600">
+                          Bestellt vom {format(new Date(position.bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
-                {(!warenbestand || warenbestand.length === 0) && (
+                {(!warenbestand?.verbrauchsmaterial || warenbestand.verbrauchsmaterial.length === 0) && (
                   <tr>
                     <td colSpan={4} className="px-6 py-4 text-sm text-gray-500 text-center">
-                      Kein Warenbestand vorhanden
+                      Kein Verbrauchsmaterial vorhanden
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Büromaterial */}
+        <div className="border-t border-gray-200">
+          <h4 className="px-4 py-3 text-md font-medium">Büromaterial</h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-300">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Artikel</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Artikelnummer</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Gesamtmenge</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Lagerorte</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {warenbestand?.bueromaterial.map((position) => (
+                  <tr key={position.id}>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.artikel.name}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.artikel.artikelnummer}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.menge} {position.artikel.einheit || 'Stück'}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      {position.lagerorte?.map((lagerort, index) => (
+                        <div key={index} className="flex justify-between">
+                          <span>{lagerort.lagerort}:</span>
+                          <span className="ml-2">{lagerort.menge}</span>
+                        </div>
+                      ))}
+                      {position.bestellung && (
+                        <div className="text-indigo-600">
+                          Bestellt vom {format(new Date(position.bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {(!warenbestand?.bueromaterial || warenbestand.bueromaterial.length === 0) && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 text-sm text-gray-500 text-center">
+                      Kein Büromaterial vorhanden
                     </td>
                   </tr>
                 )}
@@ -343,7 +441,7 @@ export default function StandortDetailPage() {
         isOpen={isAusbuchenOpen}
         onClose={() => setIsAusbuchenOpen(false)}
         standortId={id as string}
-        warenbestand={warenbestand || []}
+        warenbestand={warenbestand || { verbrauchsmaterial: [], bueromaterial: [] }}
         onSuccess={() => {
           queryClient.invalidateQueries(['standort-warenbestand', id]);
           setIsAusbuchenOpen(false);
