@@ -48,7 +48,7 @@ export default function BestellungForm({ standortId }: Props) {
   const bestand = new Map<string, BestandsArtikel>();
   
   // Warenbestand laden
-  const { data: wareneingaenge } = useQuery<WareneingangData[]>({
+  const { data: wareneingaenge = [] } = useQuery<WareneingangData[]>({
     queryKey: ['standort-warenbestand', standortId],
     queryFn: async () => {
       if (!standortId) return [];
@@ -61,7 +61,8 @@ export default function BestellungForm({ standortId }: Props) {
             id,
             name,
             artikelnummer,
-            kategorie
+            kategorie,
+            einheit
           ),
           menge,
           lagerorte,
@@ -73,42 +74,35 @@ export default function BestellungForm({ standortId }: Props) {
         .eq('standort_id', standortId);
 
       if (error) throw error;
-
-      // Transformiere die Daten in das erwartete Format
-      const transformedData = (data as unknown as SupabaseWareneingang[]).map(item => ({
-        id: item.id,
-        artikel: item.artikel,
-        menge: item.menge,
-        lagerorte: item.lagerorte,
-        bestellung: item.bestellung
-      }));
-
-      return transformedData;
+      return data || [];
     },
   });
 
   // Warenbestand berechnen
-  wareneingaenge?.forEach((eingang) => {
-    if (!eingang.artikel) return;
+  if (Array.isArray(wareneingaenge)) {
+    wareneingaenge.forEach((eingang) => {
+      if (!eingang?.artikel) return;
 
-    const current = bestand.get(eingang.artikel.id) || {
-      artikel: eingang.artikel,
-      menge: 0,
-      lagerorte: new Map<string, number>()
-    };
+      const artikelId = eingang.artikel.id;
+      const current = bestand.get(artikelId) || {
+        artikel: eingang.artikel,
+        menge: 0,
+        lagerorte: new Map<string, number>()
+      };
 
-    current.menge += eingang.menge;
+      current.menge += eingang.menge;
 
-    // Lagerorte verarbeiten
-    if (Array.isArray(eingang.lagerorte)) {
-      eingang.lagerorte.forEach((lo) => {
-        const aktuellerBestand = current.lagerorte.get(lo.lagerort) || 0;
-        current.lagerorte.set(lo.lagerort, aktuellerBestand + lo.menge);
-      });
-    }
+      // Lagerorte verarbeiten
+      if (Array.isArray(eingang.lagerorte)) {
+        eingang.lagerorte.forEach((lo) => {
+          const aktuellerBestand = current.lagerorte.get(lo.lagerort) || 0;
+          current.lagerorte.set(lo.lagerort, aktuellerBestand + lo.menge);
+        });
+      }
 
-    bestand.set(eingang.artikel.id, current);
-  });
+      bestand.set(artikelId, current);
+    });
+  }
 
   // Alle verfügbaren Artikel laden
   const { data: artikel } = useQuery<Artikel[]>({
@@ -154,15 +148,31 @@ export default function BestellungForm({ standortId }: Props) {
   const createBestellung = useMutation({
     mutationFn: async (data: BestellungFormData) => {
       try {
-        const { error } = await supabase
+        // Erst die Bestellung erstellen
+        const { data: bestellung, error: bestellungError } = await supabase
           .from('bestellungen')
           .insert({
             standort_id: standortId,
-            artikel: data.artikel,
             status: 'offen'
-          });
+          })
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (bestellungError) throw bestellungError;
+
+        // Dann die Bestellpositionen erstellen
+        const bestellungArtikel = data.artikel.map(position => ({
+          bestellung_id: bestellung.id,
+          artikel_id: position.artikel_id,
+          menge: position.menge,
+          versandte_menge: 0
+        }));
+
+        const { error: positionenError } = await supabase
+          .from('bestellung_artikel')
+          .insert(bestellungArtikel);
+
+        if (positionenError) throw positionenError;
       } catch (error: any) {
         console.error('Detailed error:', error);
         throw error;

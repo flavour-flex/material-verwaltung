@@ -91,13 +91,18 @@ export default function StandortDetailPage() {
         `)
         .eq('standort_id', id);
 
+      console.log('Rohdaten von Supabase:', wareneingaenge);
+
       if (wareneingangError) throw wareneingangError;
 
       // Warenbestand nach Artikel gruppieren
       const bestandMap = new Map();
 
       wareneingaenge?.forEach((eingang) => {
-        if (!eingang.artikel) return;
+        if (!eingang?.artikel) {
+          console.log('Überspringe Eingang ohne Artikel:', eingang);
+          return;
+        }
 
         const artikelId = eingang.artikel.id;
         const current = bestandMap.get(artikelId) || {
@@ -132,17 +137,19 @@ export default function StandortDetailPage() {
       
       console.log('Alle Artikel vor Filterung:', alleArtikel);
 
+      // Kategorien case-insensitive vergleichen
       const verbrauchsmaterial = alleArtikel.filter(
-        artikel => artikel.artikel?.kategorie === 'Verbrauchsmaterial'
+        artikel => artikel.artikel?.kategorie?.toLowerCase() === 'verbrauchsmaterial'
       );
 
       const bueromaterial = alleArtikel.filter(
-        artikel => artikel.artikel?.kategorie === 'Büromaterial'
+        artikel => artikel.artikel?.kategorie?.toLowerCase() === 'büromaterial'
       );
 
       console.log('Gefilterte Artikel:', {
         verbrauchsmaterial,
-        bueromaterial
+        bueromaterial,
+        kategorien: alleArtikel.map(a => a.artikel?.kategorie)
       });
 
       return {
@@ -150,6 +157,10 @@ export default function StandortDetailPage() {
         bueromaterial
       };
     },
+    staleTime: 0,
+    cacheTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     enabled: !!id,
   });
 
@@ -252,6 +263,15 @@ export default function StandortDetailPage() {
             className="ml-3 inline-flex items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700"
           >
             Ausbuchen
+          </button>
+          <button
+            onClick={() => queryClient.refetchQueries({ 
+              queryKey: ['standort-warenbestand', id],
+              type: 'active'
+            })}
+            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Warenbestand aktualisieren
           </button>
         </div>
       </div>

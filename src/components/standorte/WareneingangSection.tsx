@@ -14,6 +14,7 @@ import {
   transformBestellung, 
   transformToBestandsArtikel 
 } from '@/lib/transformers';
+import { format } from 'date-fns';
 
 interface WareneingangSectionProps {
   standortId: string;
@@ -49,7 +50,6 @@ interface Bestellung {
 export default function WareneingangSection({ standortId, onWareneingangComplete }: WareneingangSectionProps) {
   const [pendingOrders, setPendingOrders] = useState<BestellungType[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<BestellungType | null>(null);
-  const [locations, setLocations] = useState<string[]>([]);
   const [items, setItems] = useState<WareneingangItem[]>([]);
   const queryClient = useQueryClient();
   const bestand = new Map<string, BestandsArtikel>();
@@ -108,7 +108,7 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
     });
   }
 
-  // Lade versendete Bestellungen
+  // Lade versendete Bestellungen mit Artikeln
   useEffect(() => {
     const fetchPendingOrders = async () => {
       console.log('Fetching orders for standort:', standortId);
@@ -119,9 +119,15 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
           *,
           artikel:bestellung_artikel(
             id,
+            artikel_id,
             menge,
             versandte_menge,
-            artikel:artikel_id(*)
+            artikel:artikel_id(
+              id,
+              name,
+              artikelnummer,
+              kategorie
+            )
           )
         `)
         .eq('standort_id', standortId)
@@ -137,19 +143,7 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
       }
     };
 
-    const fetchLocations = async () => {
-      const { data, error } = await supabase
-        .from('storage_locations')
-        .select('location_name')
-        .eq('standort_id', standortId);
-
-      if (!error && data) {
-        setLocations(data.map(l => l.location_name));
-      }
-    };
-
     fetchPendingOrders();
-    fetchLocations();
   }, [standortId]);
 
   const handleOrderSelect = (order: BestellungType) => {
@@ -157,8 +151,8 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
     setItems(
       order.artikel.map(pos => ({
         ...pos.artikel,
-        id: pos.artikel.id,        // Artikel ID
-        bestellung_artikel_id: pos.id,  // Bestellung_artikel ID
+        id: pos.artikel.id,
+        bestellung_artikel_id: pos.id,
         quantity: pos.menge,
         splits: [
           { 
@@ -287,8 +281,21 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
 
       if (bestellungError) throw bestellungError;
 
-      // Korrigiere die Query-Invalidierung
-      queryClient.invalidateQueries({ queryKey: ['bestellungen'] });
+      // Queries invalidieren und sofort neu laden
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['bestellungen'] }),
+        queryClient.invalidateQueries({ 
+          queryKey: ['standort-warenbestand', standortId],
+          refetchType: 'active'
+        })
+      ]);
+
+      // Explizites Neuladen der Warenbestand-Query
+      await queryClient.refetchQueries({ 
+        queryKey: ['standort-warenbestand', standortId],
+        type: 'active'
+      });
+
       toast.success('Wareneingang erfolgreich gebucht');
       setPendingOrders(prev => prev.filter(order => order.id !== selectedOrder.id));
       onWareneingangComplete();
@@ -302,92 +309,120 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
   };
 
   return (
-    <div className="bg-white shadow rounded-lg p-6 mb-6">
-      <h3 className="text-lg font-medium mb-4">Wareneingang</h3>
-      
-      {!selectedOrder ? (
+    <div className="bg-white shadow sm:rounded-lg mb-8">
+      <div className="px-4 py-5 sm:p-6">
+        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+          Wareneingang
+        </h3>
+
+        {/* Bestellungsauswahl */}
         <div className="space-y-4">
-          <h4 className="font-medium">Versendete Bestellungen</h4>
-          {pendingOrders.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">
-              Keine versendeten Bestellungen vorhanden
-            </div>
-          ) : (
-            pendingOrders.map(order => (
-              <div key={order.id} className="border p-4 rounded-md">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div>Bestellung #{order.id}</div>
-                    <div className="text-sm text-gray-500">
-                      {order.artikel.length} Artikel
+          <label className="block text-sm font-medium text-gray-700">
+            Versendete Bestellung auswählen
+          </label>
+          <select
+            value={selectedOrder?.id || ''}
+            onChange={(e) => {
+              const order = pendingOrders.find(o => o.id === e.target.value);
+              if (order) handleOrderSelect(order);
+            }}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          >
+            <option value="">Bitte wählen</option>
+            {pendingOrders.map((order) => (
+              <option key={order.id} value={order.id}>
+                Bestellung vom {format(new Date(order.created_at), 'dd.MM.yyyy')}
+                {' - '}
+                {order.artikel.length} Artikel
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Artikel der ausgewählten Bestellung */}
+        {selectedOrder && (
+          <>
+            <div className="mt-6">
+              <h4 className="text-sm font-medium text-gray-900 mb-4">Artikel in dieser Bestellung:</h4>
+              <div className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={item.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h5 className="font-medium">{item.name}</h5>
+                        <p className="text-sm text-gray-500">Art.Nr.: {item.artikelnummer}</p>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Menge: {item.quantity}
+                      </div>
                     </div>
+
+                    {/* Lagerort-Splits */}
+                    {item.splits.map((split, splitIndex) => (
+                      <div key={splitIndex} className="flex gap-4 mt-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            value={split.location}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              newItems[index].splits[splitIndex].location = e.target.value;
+                              setItems(newItems);
+                            }}
+                            placeholder="Lagerort eingeben"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <input
+                            type="number"
+                            min="1"
+                            max={item.quantity}
+                            value={split.quantity}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              newItems[index].splits[splitIndex].quantity = parseInt(e.target.value);
+                              setItems(newItems);
+                            }}
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Button zum Hinzufügen weiterer Splits */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = [...items];
+                        newItems[index].splits.push({
+                          location: '',
+                          quantity: 0
+                        });
+                        setItems(newItems);
+                      }}
+                      className="mt-2 text-sm text-indigo-600 hover:text-indigo-500"
+                    >
+                      Weiteren Lagerort hinzufügen
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleOrderSelect(order)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded"
-                  >
-                    Einbuchen
-                  </button>
-                </div>
+                ))}
               </div>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <h4 className="font-medium">Bestellung #{selectedOrder.id} einbuchen</h4>
-          
-          {items.map((item, itemIndex) => (
-            <div key={item.id} className="mb-4 p-4 border rounded">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-medium">{item.name}</h4>
-                <button
-                  type="button"
-                  onClick={() => handleSplitItem(itemIndex)}
-                  className="text-sm text-indigo-600 hover:text-indigo-900"
-                >
-                  Aufteilen
-                </button>
-              </div>
-              <p className="text-sm text-gray-500">Gesamtmenge: {item.quantity}</p>
-              
-              {item.splits.map((split, splitIndex) => (
-                <div key={splitIndex} className="mt-2 flex gap-4">
-                  <input
-                    type="number"
-                    value={split.quantity}
-                    onChange={(e) => handleQuantityChange(itemIndex, splitIndex, parseInt(e.target.value))}
-                    className="border rounded px-2 py-1 w-24"
-                    max={item.quantity}
-                  />
-                  <AutoComplete
-                    value={split.location}
-                    onChange={(value) => handleLocationChange(itemIndex, splitIndex, value)}
-                    suggestions={locations}
-                    placeholder="Lagerort"
-                    className="flex-1"
-                  />
-                </div>
-              ))}
             </div>
-          ))}
-          
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="text-gray-600 px-4 py-2 rounded"
-            >
-              Abbrechen
-            </button>
-            <button
-              onClick={handleEinbuchen}
-              className="bg-green-500 text-white px-4 py-2 rounded"
-            >
-              Einbuchen
-            </button>
-          </div>
-        </div>
-      )}
+
+            {/* Einbuchen Button */}
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handleEinbuchen}
+                className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              >
+                Wareneingang buchen
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 } 
