@@ -25,7 +25,15 @@ export default function StandortDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('standorte')
-        .select('*')
+        .select(`
+          id,
+          name,
+          adresse,
+          plz,
+          stadt,
+          land,
+          verantwortliche
+        `)
         .eq('id', id)
         .single();
       
@@ -221,38 +229,22 @@ export default function StandortDetailPage() {
           <div className="mt-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Verantwortliche</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {standort.verantwortliche.map((verantwortlicher, index) => (
-                <div 
-                  key={index}
-                  className="bg-gray-50 rounded-lg p-4 text-sm"
-                >
-                  <div className="font-medium text-gray-900">{verantwortlicher.name}</div>
-                  <div className="text-gray-500 mt-1">
-                    <div className="flex items-center">
-                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      <a 
-                        href={`mailto:${verantwortlicher.email}`}
-                        className="hover:text-indigo-600"
-                      >
-                        {verantwortlicher.email}
-                      </a>
-                    </div>
-                    <div className="flex items-center mt-1">
-                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      <a 
-                        href={`tel:${verantwortlicher.telefon}`}
-                        className="hover:text-indigo-600"
-                      >
-                        {verantwortlicher.telefon}
-                      </a>
-                    </div>
+              {Array.isArray(standort?.verantwortliche) && standort.verantwortliche.length > 0 ? (
+                standort.verantwortliche.map((verantwortlicher, index) => (
+                  <div 
+                    key={`${verantwortlicher.name}-${index}`}
+                    className="bg-gray-50 rounded-lg p-4 text-sm"
+                  >
+                    <p className="font-medium">{verantwortlicher.name}</p>
+                    <p className="text-gray-500">{verantwortlicher.email}</p>
+                    {verantwortlicher.telefon && (
+                      <p className="text-gray-500">{verantwortlicher.telefon}</p>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-gray-500">Keine Verantwortlichen zugewiesen</p>
+              )}
             </div>
           </div>
         </div>
@@ -371,7 +363,7 @@ export default function StandortDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {(warenbestand?.verbrauchsmaterial || []).map((position) => (
-                  <tr key={position.artikel.id}>
+                  <tr key={`${position.artikel.id}-${position.id}`}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.artikel.name}
                     </td>
@@ -383,7 +375,7 @@ export default function StandortDetailPage() {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.lagerorte?.map((lagerort, index) => (
-                        <div key={index} className="flex justify-between">
+                        <div key={`${lagerort.lagerort}-${index}`} className="flex justify-between">
                           <span>{lagerort.lagerort}:</span>
                           <span className="ml-2">{lagerort.menge}</span>
                         </div>
@@ -418,7 +410,7 @@ export default function StandortDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {(warenbestand?.bueromaterial || []).map((position) => (
-                  <tr key={position.artikel.id}>
+                  <tr key={`${position.artikel.id}-${position.id}`}>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.artikel.name}
                     </td>
@@ -430,7 +422,7 @@ export default function StandortDetailPage() {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {position.lagerorte?.map((lagerort, index) => (
-                        <div key={index} className="flex justify-between">
+                        <div key={`${lagerort.lagerort}-${index}`} className="flex justify-between">
                           <span>{lagerort.lagerort}:</span>
                           <span className="ml-2">{lagerort.menge}</span>
                         </div>

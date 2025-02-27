@@ -77,7 +77,6 @@ export default function HauptlagerPage() {
   });
 
   const handlePrint = (bestellung: any) => {
-    // Öffne neues Fenster für die Pickliste
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -113,7 +112,7 @@ export default function HauptlagerPage() {
               <tr>
                 <th>Artikel</th>
                 <th>Artikelnummer</th>
-                <th>Menge</th>
+                <th>Bestellmenge</th>
                 <th>Geprüft</th>
               </tr>
             </thead>
@@ -122,7 +121,7 @@ export default function HauptlagerPage() {
                 <tr>
                   <td>${pos.artikel.name}</td>
                   <td>${pos.artikel.artikelnummer}</td>
-                  <td>${pos.versandte_menge} / ${pos.menge}</td>
+                  <td>${pos.menge} Stück</td>
                   <td style="width: 100px;">□</td>
                 </tr>
               `).join('')}
@@ -219,7 +218,7 @@ export default function HauptlagerPage() {
                         onClick={() => setSelectedBestellung(selectedBestellung === bestellung.id ? null : bestellung.id)}
                         className="text-indigo-600 hover:text-indigo-900"
                       >
-                        {bestellung.bestellung_artikel.length} Artikel anzeigen
+                        {bestellung.bestellung_artikel.reduce((sum, pos) => sum + pos.menge, 0)} Artikel bestellt
                       </button>
                       {selectedBestellung === bestellung.id && (
                         <div className="mt-2">
@@ -232,7 +231,7 @@ export default function HauptlagerPage() {
                                     <p className="text-sm text-gray-500">Art.Nr.: {position.artikel.artikelnummer}</p>
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {position.versandte_menge} / {position.menge} versandt
+                                    {position.menge} Stück bestellt
                                   </div>
                                 </div>
                               </li>

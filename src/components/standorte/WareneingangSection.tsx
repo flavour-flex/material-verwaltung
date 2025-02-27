@@ -108,56 +108,56 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
     });
   }
 
-  // Lade versendete Bestellungen mit Artikeln
-  useEffect(() => {
-    const fetchPendingOrders = async () => {
+  const { data: bestellungen = [] } = useQuery<BestellungType[]>({
+    queryKey: ['bestellungen', standortId],
+    queryFn: async () => {
       console.log('Fetching orders for standort:', standortId);
-
+      
       const { data, error } = await supabase
         .from('bestellungen')
         .select(`
-          *,
-          artikel:bestellung_artikel(
+          id,
+          status,
+          created_at,
+          bestellung_artikel!bestellung_id (
             id,
             artikel_id,
             menge,
             versandte_menge,
-            artikel:artikel_id(
+            artikel:artikel_id (
               id,
               name,
-              artikelnummer,
-              kategorie
+              artikelnummer
             )
           )
         `)
         .eq('standort_id', standortId)
-        .in('status', ['versendet', 'teilweise_versendet']);
+        .in('status', ['versendet', 'teilweise_versendet'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
 
       console.log('Fetched orders:', data, 'Error:', error);
-
-      if (!error && data) {
-        const processedOrders = data.map(transformBestellung);
-        setPendingOrders(processedOrders);
-      } else {
-        console.error('Error fetching orders:', error);
-      }
-    };
-
-    fetchPendingOrders();
-  }, [standortId]);
+      return data || [];
+    },
+    enabled: !!standortId
+  });
 
   const handleOrderSelect = (order: BestellungType) => {
     setSelectedOrder(order);
     setItems(
-      order.artikel.map(pos => ({
+      order.bestellung_artikel.map(pos => ({
         ...pos.artikel,
         id: pos.artikel.id,
         bestellung_artikel_id: pos.id,
-        quantity: pos.menge,
+        quantity: pos.versandte_menge || 0,
         splits: [
           { 
             location: '', 
-            quantity: pos.menge 
+            quantity: pos.versandte_menge || 0
           }
         ]
       }))
@@ -323,17 +323,19 @@ export default function WareneingangSection({ standortId, onWareneingangComplete
           <select
             value={selectedOrder?.id || ''}
             onChange={(e) => {
-              const order = pendingOrders.find(o => o.id === e.target.value);
+              const order = bestellungen.find(o => o.id === e.target.value);
               if (order) handleOrderSelect(order);
             }}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           >
             <option value="">Bitte wählen</option>
-            {pendingOrders.map((order) => (
+            {bestellungen.map((order) => (
               <option key={order.id} value={order.id}>
                 Bestellung vom {format(new Date(order.created_at), 'dd.MM.yyyy')}
                 {' - '}
-                {order.artikel.length} Artikel
+                {order.bestellung_artikel.length} Artikel
+                {' - '}
+                {order.status === 'teilweise_versendet' ? '(Teillieferung)' : '(Vollständig)'}
               </option>
             ))}
           </select>

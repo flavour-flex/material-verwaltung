@@ -33,6 +33,7 @@ export default function BestellungenPage() {
             menge,
             versandte_menge,
             artikel:artikel_id (
+              id,
               name,
               artikelnummer
             )

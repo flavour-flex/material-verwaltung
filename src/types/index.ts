@@ -20,8 +20,8 @@ export interface Artikel {
   name: string;
   artikelnummer: string;
   beschreibung?: string;
-  kategorie: 'Verbrauchsmaterial' | 'Büromaterial' | 'Hardware';
-  einheit: string;
+  kategorie: 'verbrauchsmaterial' | 'bueromaterial' | 'hardware';
+  einheit?: string;
   mindestbestand?: number;
   created_at?: string;
   serviceintervall_monate?: number | null;
@@ -35,6 +35,11 @@ export interface Artikel {
 }
 
 export interface HardwareArtikel extends Artikel {
+  seriennummer?: string;
+  anschaffungsdatum?: string;
+  garantie_bis?: string;
+  wartung_intervall?: number;
+  letzte_wartung?: string;
   serviceintervall_monate: number;
   wechselintervall_jahre: number;
   standort_id: string;
@@ -54,24 +59,19 @@ export type BestellungStatus = 'offen' | 'versendet' | 'eingetroffen' | 'stornie
 
 export interface BestellungType {
   id: string;
-  standort_id: string;
-  status: BestellungStatus;
+  status: 'offen' | 'versendet' | 'teilweise_versendet' | 'eingetroffen' | 'storniert';
   created_at: string;
+  standort_id: string;
+  bestellung_artikel: BestellungArtikelType[];
+  standort?: {
+    name: string;
+    adresse?: string;
+    verantwortliche?: Verantwortlicher[];
+  };
   ersteller_id: string;
   versender_id?: string;
   versand_datum?: string;
   eingetroffen_datum?: string;
-  bestellung_artikel: {
-    id: string;
-    menge: number;
-    versandte_menge: number;
-    artikel: {
-      name: string;
-    };
-  }[];
-  standort?: {
-    name: string;
-  };
   ersteller?: {
     email: string;
     full_name: string;
@@ -102,19 +102,10 @@ export interface Wareneingang {
 }
 
 export interface WareneingangData {
-  id: string;
-  artikel: {
-    id: string;
-    name: string;
-    artikelnummer: string;
-    kategorie: string;
-  };
+  bestellung_id: string;
+  artikel_id: string;
   menge: number;
   lagerorte: LagerortPosition[];
-  bestellung?: {
-    id: string;
-    created_at: string;
-  };
 }
 
 export interface BestandsArtikel {
@@ -126,4 +117,16 @@ export interface BestandsArtikel {
   };
   menge: number;
   lagerorte: Map<string, number>;
+}
+
+export interface BestellungArtikelType {
+  id: string;
+  artikel_id: string;
+  menge: number;
+  versandte_menge: number;
+  artikel: {
+    id: string;
+    name: string;
+    artikelnummer: string;
+  };
 } 

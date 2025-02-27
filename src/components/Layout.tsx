@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, ReactNode } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import {
   Bars3Icon,
@@ -97,7 +97,11 @@ const navigation = [
   }
 ];
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
   const { isLoading, isAuthenticated } = useAuth();
@@ -143,11 +147,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {item.href ? (
           <Link
             href={item.href}
-            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+            className={classNames(
               router.pathname === item.href
                 ? 'bg-indigo-800 text-white'
-                : 'text-indigo-100 hover:bg-indigo-600'
-            }`}
+                : 'text-indigo-100 hover:bg-indigo-600',
+              'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+            )}
           >
             <item.icon className="mr-3 h-6 w-6 flex-shrink-0" aria-hidden="true" />
             {item.name}
@@ -181,22 +186,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Mobile menu button */}
-      <div className="fixed top-0 left-0 z-40 lg:hidden">
-        <button
-          type="button"
-          className="p-2 m-2 text-gray-500 hover:text-gray-600"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <span className="sr-only">Menü öffnen</span>
-          <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-        </button>
-      </div>
-
-      {/* Mobile Sidebar */}
+    <div>
       <Transition.Root show={sidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-40 lg:hidden" onClose={setSidebarOpen}>
+        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -206,10 +198,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
+            <div className="fixed inset-0 bg-gray-900/80" />
           </Transition.Child>
 
-          <div className="fixed inset-0 z-40 flex">
+          <div className="fixed inset-0 flex">
             <Transition.Child
               as={Fragment}
               enter="transition ease-in-out duration-300 transform"
@@ -219,120 +211,68 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
-              <Dialog.Panel className="relative flex w-full max-w-xs flex-1 flex-col bg-indigo-700">
-                <Transition.Child
-                  as={Fragment}
-                  enter="ease-in-out duration-300"
-                  enterFrom="opacity-0"
-                  enterTo="opacity-100"
-                  leave="ease-in-out duration-300"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <div className="absolute top-0 right-0 -mr-12 pt-2">
-                    <button
-                      type="button"
-                      className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <span className="sr-only">Menü schließen</span>
-                      <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                    </button>
-                  </div>
-                </Transition.Child>
-                <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                  <div className="flex-shrink-0 flex items-center px-4">
+              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-indigo-700 px-6 pb-4">
+                  <div className="flex h-16 shrink-0 items-center">
                     <img
-                      className="h-12 w-auto"
+                      className="h-8 w-auto"
                       src="/logo.png"
                       alt="Logo"
                     />
                   </div>
-                  <nav className="mt-5 px-2 space-y-1">
-                    {navigation.map(item => renderNavItem(item))}
+                  <nav className="flex flex-1 flex-col">
+                    <ul role="list" className="flex flex-1 flex-col gap-y-7">
+                      <li>
+                        <ul role="list" className="-mx-2 space-y-1">
+                          {navigation.map(item => renderNavItem(item))}
+                        </ul>
+                      </li>
+                    </ul>
                   </nav>
-                </div>
-                <div className="flex-shrink-0 flex border-t border-indigo-800 p-4">
-                  <button
-                    onClick={handleLogout}
-                    className="group flex items-center px-2 py-2 text-base font-medium rounded-md text-indigo-100 hover:bg-indigo-600 w-full"
-                  >
-                    <ArrowRightOnRectangleIcon
-                      className="mr-3 h-6 w-6 flex-shrink-0 text-indigo-300"
-                      aria-hidden="true"
-                    />
-                    Abmelden
-                  </button>
                 </div>
               </Dialog.Panel>
             </Transition.Child>
-            <div className="w-14 flex-shrink-0">{/* Force sidebar to shrink to fit close icon */}</div>
           </div>
         </Dialog>
       </Transition.Root>
 
       {/* Static sidebar for desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col bg-indigo-700">
-          <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-            <div className="flex flex-shrink-0 items-center px-4">
-              <img
-                className="h-12 w-auto"
-                src="/logo.png"
-                alt="Logo"
-              />
-            </div>
-            <nav className="mt-5 flex-1 space-y-1 px-2">
-              {navigation.map(item => renderNavItem(item))}
-            </nav>
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-indigo-700 px-6 pb-4">
+          <div className="flex h-16 shrink-0 items-center">
+            <img
+              className="h-8 w-auto"
+              src="/logo.png"
+              alt="Logo"
+            />
           </div>
-          {/* Abmelden Button */}
-          <div className="flex-shrink-0 flex border-t border-indigo-800 p-4">
-            <button
-              onClick={handleLogout}
-              className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-indigo-100 hover:bg-indigo-600 w-full"
-            >
-              <ArrowRightOnRectangleIcon
-                className="mr-3 h-6 w-6 flex-shrink-0 text-indigo-300 group-hover:text-indigo-200"
-                aria-hidden="true"
-              />
-              Abmelden
-            </button>
-          </div>
+          <nav className="flex flex-1 flex-col">
+            <ul role="list" className="flex flex-1 flex-col gap-y-7">
+              <li>
+                <ul role="list" className="-mx-2 space-y-1">
+                  {navigation.map(item => renderNavItem(item))}
+                </ul>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="lg:pl-64 flex flex-col flex-1">
-        {/* Mobile menu button */}
-        <div className="sticky top-0 z-10 lg:hidden">
-          <div className="flex h-16 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-0 lg:shadow-none">
-            <button
-              type="button"
-              className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <span className="sr-only">Menü öffnen</span>
-              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-            </button>
-            <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-              <div className="flex items-center gap-x-4 lg:gap-x-6">
-                <div className="flex-1 text-sm font-semibold leading-6 text-gray-900">
-                  {navigation.find(item => 
-                    item.href === router.pathname || 
-                    item.children?.some(child => child.href === router.pathname)
-                  )?.name || 'Dashboard'}
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="lg:pl-72">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+          <button
+            type="button"
+            className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <span className="sr-only">Open sidebar</span>
+            <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+          </button>
         </div>
 
-        <main className="flex-1">
-          <div className="py-10">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              {children}
-            </div>
+        <main className="py-10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {children}
           </div>
         </main>
       </div>

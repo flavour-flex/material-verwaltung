@@ -21,14 +21,19 @@ export default function BestellungDetailsPage() {
       const { data, error } = await supabase
         .from('bestellungen')
         .select(`
-          *,
+          id,
+          status,
+          created_at,
           standort:standort_id (
             name,
             adresse
           ),
-          bestellung_artikel!bestellung_id (
+          bestellung_artikel!bestellung_id ( 
+            id,
             menge,
+            versandte_menge,
             artikel:artikel_id (
+              id,
               name,
               artikelnummer,
               beschreibung,
@@ -52,7 +57,6 @@ export default function BestellungDetailsPage() {
         throw error;
       }
       
-      console.log('Bestellung data:', data);
       return data;
     },
     enabled: !!id,
@@ -108,116 +112,69 @@ export default function BestellungDetailsPage() {
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="sm:flex sm:items-center">
           <div className="sm:flex-auto">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/bestellungen"
-                className="group flex items-center text-sm font-medium text-gray-500 hover:text-gray-700"
-              >
-                <ArrowLeftIcon className="mr-1 h-5 w-5" />
-                Zurück
-              </Link>
-              <h1 className="text-xl font-semibold text-gray-900">
-                Bestellung #{bestellung.id.slice(0, 8)}
-              </h1>
-            </div>
+            <Link href="/bestellungen" className="inline-flex items-center text-indigo-600 hover:text-indigo-900">
+              <ArrowLeftIcon className="h-5 w-5 mr-2" />
+              Zurück zur Übersicht
+            </Link>
+            <h1 className="mt-4 text-2xl font-semibold text-gray-900">
+              Bestellung #{bestellung.id}
+            </h1>
           </div>
         </div>
 
         <div className="mt-8 flow-root">
-          <div className="overflow-hidden bg-white shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">
-                Bestelldetails
-              </h3>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                      bestellung.status === 'offen' ? 'bg-yellow-100 text-yellow-800' :
-                      bestellung.status === 'versendet' ? 'bg-blue-100 text-blue-800' :
-                      bestellung.status === 'storniert' ? 'bg-red-100 text-red-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {bestellung.status}
-                    </span>
-                  </dd>
-                </div>
-
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Standort</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {bestellung.standort.name}
-                    <p className="text-gray-500">{bestellung.standort.adresse}</p>
-                  </dd>
-                </div>
-
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Erstellt von</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {bestellung.ersteller?.full_name || bestellung.ersteller?.email}
-                    <p className="text-gray-500">
-                      am {format(new Date(bestellung.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                    </p>
-                  </dd>
-                </div>
-
-                {bestellung.versender && (
-                  <div className="sm:col-span-1">
-                    <dt className="text-sm font-medium text-gray-500">Versendet von</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {bestellung.versender?.full_name || bestellung.versender?.email}
-                      <p className="text-gray-500">
-                        am {format(new Date(bestellung.versand_datum), 'dd.MM.yyyy HH:mm', { locale: de })}
-                      </p>
-                    </dd>
-                  </div>
-                )}
-
-                {bestellung.eingetroffen_datum && (
-                  <div className="sm:col-span-1">
-                    <dt className="text-sm font-medium text-gray-500">Eingetroffen am</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {format(new Date(bestellung.eingetroffen_datum), 'dd.MM.yyyy HH:mm', { locale: de })}
-                    </dd>
-                  </div>
-                )}
-
-                <div className="sm:col-span-2">
-                  <dt className="text-sm font-medium text-gray-500">Artikel</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-300">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Artikel</th>
-                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Artikelnummer</th>
-                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Kategorie</th>
-                            <th className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">Menge</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                          {bestellung.bestellung_artikel.map((pos: any) => (
-                            <tr key={pos.artikel.id}>
-                              <td className="py-4 pl-4 pr-3 text-sm text-gray-900">
-                                {pos.artikel.name}
-                                {pos.artikel.beschreibung && (
-                                  <p className="text-gray-500">{pos.artikel.beschreibung}</p>
-                                )}
-                              </td>
-                              <td className="px-3 py-4 text-sm text-gray-500">{pos.artikel.artikelnummer}</td>
-                              <td className="px-3 py-4 text-sm text-gray-500">{pos.artikel.kategorie}</td>
-                              <td className="px-3 py-4 text-sm text-right text-gray-500">{pos.menge} Stück</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </dd>
-                </div>
-              </dl>
+          <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+              <table className="min-w-full divide-y divide-gray-300">
+                <thead>
+                  <tr>
+                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">
+                      Artikel
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      Artikelnummer
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                      Bestellt
+                    </th>
+                    {bestellung?.status === 'teilweise_versendet' && (
+                      <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                        Versendet
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {bestellung?.bestellung_artikel?.map((position) => (
+                    <tr key={`${position.artikel?.id}-${position.id}`}>
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-0">
+                        {position.artikel?.name}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {position.artikel?.artikelnummer}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right">
+                        {position.menge} Stück
+                      </td>
+                      {bestellung.status === 'teilweise_versendet' && (
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right">
+                          {position.versandte_menge || 0} Stück
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {(!bestellung?.bestellung_artikel || bestellung.bestellung_artikel.length === 0) && (
+                    <tr>
+                      <td 
+                        colSpan={bestellung?.status === 'teilweise_versendet' ? 4 : 3} 
+                        className="px-3 py-4 text-sm text-gray-500 text-center"
+                      >
+                        Keine Artikel in dieser Bestellung
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

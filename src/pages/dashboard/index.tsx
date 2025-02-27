@@ -123,236 +123,26 @@ export default function DashboardPage() {
     }
   });
 
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      // Ihre Dashboard-Statistiken-Logik hier
+      return {};
+    },
+  });
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <Layout>
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className="py-6">
         <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-
-        {/* Wenn alle Daten laden, zeigen wir den LoadingSpinner im Content-Bereich */}
-        {(bestellungenLoading && ausbuchungenLoading && bestandLoading && niedrigLoading) ? (
-          <LoadingSpinner />
-        ) : (
-          <>
-            {/* Statistik-Kacheln */}
-            <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Kacheln mit Skeleton-Loading */}
-              {(bestellungenLoading || ausbuchungenLoading || bestandLoading || niedrigLoading) ? (
-                <>
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white overflow-hidden shadow rounded-lg">
-                      <div className="p-5">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
-                          </div>
-                          <div className="ml-5 w-0 flex-1">
-                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
-                            <div className="h-6 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 px-5 py-3">
-                        <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse"></div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {/* Offene Bestellungen */}
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <ClipboardDocumentListIcon className="h-6 w-6 text-gray-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Offene Bestellungen
-                            </dt>
-                            <dd className="flex items-baseline">
-                              <div className="text-2xl font-semibold text-gray-900">
-                                {offeneBestellungen?.length || 0}
-                              </div>
-                            </dd>
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 px-5 py-3">
-                      <Link href="/bestellungen" className="text-sm font-medium text-indigo-600 hover:text-indigo-900">
-                        Alle anzeigen
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Gesamtbestand */}
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <CubeIcon className="h-6 w-6 text-gray-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Gesamtbestand
-                            </dt>
-                            <dd className="flex items-baseline">
-                              <div className="text-2xl font-semibold text-gray-900">
-                                {gesamtbestand?.gesamt || 0}
-                              </div>
-                            </dd>
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="px-5 py-3">
-                      <div className="text-sm text-gray-500">
-                        {Object.entries(gesamtbestand?.kategorien || {}).map(([kategorie, anzahl]) => (
-                          <div key={kategorie} className="flex justify-between">
-                            <span>{kategorie}:</span>
-                            <span>{anzahl}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Niedrige Bestände */}
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Niedrige Bestände
-                            </dt>
-                            <dd className="flex items-baseline">
-                              <div className="text-2xl font-semibold text-gray-900">
-                                {niedrigeBestaende?.length || 0}
-                              </div>
-                            </dd>
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="px-5 py-3">
-                      <div className="text-sm text-gray-500 space-y-1">
-                        {niedrigeBestaende?.slice(0, 3).map(artikel => (
-                          <div key={artikel.id} className="flex justify-between">
-                            <span className="truncate">{artikel.name}</span>
-                            <span className="ml-2">{artikel.bestand}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Letzte Aktivitäten */}
-            <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Aktivitäten mit Skeleton-Loading */}
-              {(bestellungenLoading || ausbuchungenLoading) ? (
-                <>
-                  {[1, 2].map((i) => (
-                    <div key={i} className="bg-white shadow sm:rounded-lg">
-                      <div className="px-4 py-5 sm:p-6">
-                        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4 animate-pulse"></div>
-                        <div className="space-y-4">
-                          {[1, 2, 3].map((j) => (
-                            <div key={j} className="flex items-center space-x-4">
-                              <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
-                              <div className="flex-1">
-                                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
-                                <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                              </div>
-                              <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {/* Letzte Ausbuchungen */}
-                  <div className="bg-white shadow sm:rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">
-                        Letzte Ausbuchungen
-                      </h3>
-                      <div className="mt-5 flow-root">
-                        <div className="-my-4 divide-y divide-gray-200">
-                          {letzteAusbuchungen?.map((ausbuchung) => (
-                            <div key={ausbuchung.id} className="py-4">
-                              <div className="flex items-center space-x-4">
-                                <div className="flex-shrink-0">
-                                  <ArrowTrendingDownIcon className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-gray-900">
-                                    {ausbuchung.artikel.name}
-                                  </p>
-                                  <p className="text-sm text-gray-500">
-                                    {ausbuchung.menge} Stück • {ausbuchung.standort?.name}
-                                  </p>
-                                </div>
-                                <div className="flex-shrink-0 whitespace-nowrap text-sm text-gray-500">
-                                  {format(new Date(ausbuchung.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Offene Bestellungen Details */}
-                  <div className="bg-white shadow sm:rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">
-                        Offene Bestellungen
-                      </h3>
-                      <div className="mt-5 flow-root">
-                        <div className="-my-4 divide-y divide-gray-200">
-                          {offeneBestellungen?.map((bestellung) => (
-                            <div key={bestellung.id} className="py-4">
-                              <div className="flex items-center space-x-4">
-                                <div className="flex-shrink-0">
-                                  <BuildingOfficeIcon className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-gray-900">
-                                    {bestellung.standort.name}
-                                  </p>
-                                  <p className="text-sm text-gray-500">
-                                    {bestellung.artikel.length} Artikel
-                                  </p>
-                                </div>
-                                <div className="flex-shrink-0 whitespace-nowrap text-sm text-gray-500">
-                                  {format(new Date(bestellung.created_at), 'dd.MM.yyyy', { locale: de })}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
+        
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Dashboard-Inhalt hier */}
+        </div>
       </div>
     </Layout>
   );
