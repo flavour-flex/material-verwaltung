@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { createContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
+import { supabase } from '@/lib/supabase';
 
-interface AuthContextType {
-  user: any;
+interface AuthState {
+  user: any | null;
   userRole: string | null;
   verantwortlicherStandorte: string[];
   isAdmin: boolean;
@@ -12,66 +13,68 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthState>({
   user: null,
   userRole: null,
   verantwortlicherStandorte: [],
   isAdmin: false,
   isStandortverantwortlich: false,
   isLoading: true,
-  isAuthenticated: false
+  isAuthenticated: false,
 });
 
-export const useAuthContext = () => useContext(AuthContext);
-
-const PUBLIC_ROUTES = ['/login', '/auth/set-password'];
-
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [authState, setAuthState] = useState<AuthContextType>({
+  const [authState, setAuthState] = useState<AuthState>({
     user: null,
     userRole: null,
     verantwortlicherStandorte: [],
     isAdmin: false,
     isStandortverantwortlich: false,
     isLoading: true,
-    isAuthenticated: false
+    isAuthenticated: false,
   });
 
   useEffect(() => {
-    if (status === 'loading') {
-      return;
-    }
+    const initAuth = async () => {
+      if (status === 'loading') return;
 
-    setAuthState({
-      user: session?.user ?? null,
-      userRole: session?.user?.role ?? null,
-      verantwortlicherStandorte: session?.user?.verantwortlicherStandorte ?? [],
-      isAdmin: session?.user?.role === 'ADMIN',
-      isStandortverantwortlich: session?.user?.role === 'STANDORT_VERANTWORTLICHER',
-      isLoading: false,
-      isAuthenticated: !!session
-    });
+      if (!session) {
+        if (!router.pathname.startsWith('/login')) {
+          router.push('/login');
+        }
+        setAuthState(prev => ({ ...prev, isLoading: false }));
+        return;
+      }
 
-    const isPublicRoute = PUBLIC_ROUTES.includes(router.pathname);
-    const shouldRedirectToLogin = !session && !isPublicRoute;
-    const shouldRedirectToDashboard = session && isPublicRoute;
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user?.email)
+          .single();
 
-    if (shouldRedirectToLogin) {
-      router.replace('/login').catch(console.error);
-    } else if (shouldRedirectToDashboard) {
-      router.replace('/').catch(console.error);
-    }
-  }, [session, status]);
+        if (error) throw error;
 
-  if (status === 'loading' || authState.isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Laden...</div>
-      </div>
-    );
-  }
+        setAuthState({
+          user: session.user,
+          userRole: userData?.role || null,
+          verantwortlicherStandorte: userData?.verantwortlicher_standorte || [],
+          isAdmin: userData?.role === 'ADMIN',
+          isStandortverantwortlich: userData?.role === 'STANDORT_VERANTWORTLICHER',
+          isLoading: false,
+          isAuthenticated: true
+        });
+
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setAuthState(prev => ({ ...prev, isLoading: false }));
+      }
+    };
+
+    initAuth();
+  }, [session, status, router]);
 
   return (
     <AuthContext.Provider value={authState}>
