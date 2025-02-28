@@ -5,15 +5,14 @@ import type { Artikel as ArtikelType, HardwareArtikel } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-const KATEGORIEN = [
+type Kategorie = 'Hardware' | 'Verbrauchsmaterial' | 'Büromaterial' | 'Sonstiges';
+
+const kategorien: Kategorie[] = [
   'Hardware',
-  'Software',
   'Verbrauchsmaterial',
   'Büromaterial',
-  'Sonstiges',
-] as const;
-
-type Kategorie = typeof KATEGORIEN[number];
+  'Sonstiges'
+];
 
 const EINHEITEN = [
   'Stück',
@@ -154,10 +153,9 @@ export default function ArtikelForm({ onSubmit, initialData }: Props) {
             <div className="mt-1">
               <select
                 {...register('kategorie')}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               >
-                <option value="">Bitte wählen</option>
-                {KATEGORIEN.map(kategorie => (
+                {kategorien.map((kategorie) => (
                   <option key={kategorie} value={kategorie}>
                     {kategorie}
                   </option>
