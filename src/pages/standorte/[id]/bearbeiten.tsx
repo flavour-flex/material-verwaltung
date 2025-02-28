@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import Layout from '@/components/Layout';
 import StandortForm from '@/components/standorte/StandortForm';
@@ -10,6 +10,7 @@ import type { Standort } from '@/types';
 export default function StandortBearbeitenPage() {
   const router = useRouter();
   const { id } = router.query;
+  const queryClient = useQueryClient();
 
   // Standort-Daten laden
   const { data: standort, isLoading } = useQuery<Standort>({
@@ -29,28 +30,30 @@ export default function StandortBearbeitenPage() {
 
   // Mutation für das Aktualisieren des Standorts
   const updateStandort = useMutation({
-    mutationFn: async (data: Omit<Standort, 'id' | 'created_at'>) => {
+    mutationFn: async (data: StandortFormData) => {
       const { error } = await supabase
         .from('standorte')
-        .update({
-          name: data.name,
-          adresse: data.adresse,
-          plz: data.plz,
-          stadt: data.stadt,
-          land: data.land,
-          verantwortliche: data.verantwortliche,
-        })
+        .update(data)
         .eq('id', id);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
+      // Cache invalidieren
+      queryClient.invalidateQueries(['standorte']);
+      queryClient.invalidateQueries(['standort', id]);
+      
+      // Erfolgsmeldung
       toast.success('Standort erfolgreich aktualisiert');
-      router.push(`/standorte/${id}`);
+      
+      // Kurze Verzögerung für die Cache-Aktualisierung
+      setTimeout(() => {
+        router.push(`/standorte/${id}`);
+      }, 100);
     },
     onError: (error) => {
+      console.error('Update error:', error);
       toast.error('Fehler beim Aktualisieren des Standorts');
-      console.error('Update Fehler:', error);
     },
   });
 
