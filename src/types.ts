@@ -24,4 +24,20 @@ export interface AusbuchungGruppe {
     name: string;
   };
   positionen: Ausbuchung[];
+}
+
+export interface Artikel {
+  id: string;
+  name: string;
+  artikelnummer: string;
+  kategorie: string;
+  einheit: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HardwareArtikel extends Artikel {
+  last_service?: string;
+  next_service?: string;
+  seriennummer?: string;
 } 
