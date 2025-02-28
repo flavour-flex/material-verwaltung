@@ -29,7 +29,7 @@ interface LayoutProps {
 
 interface NavigationItem {
   name: string;
-  href: string;
+  href?: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   children?: NavigationItem[];
 }
@@ -141,9 +141,9 @@ export default function Layout({ children }: LayoutProps) {
                     <div className="flex space-x-4">
                       {navigation.map((item) => (
                         <Fragment key={item.name}>
-                          {item.href ? (
+                          {!item.children ? (
                             <Link
-                              href={item.href}
+                              href={item.href || '#'}
                               className={classNames(
                                 router.pathname === item.href
                                   ? 'bg-[#023770]/10 text-white'
