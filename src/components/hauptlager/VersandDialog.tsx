@@ -30,6 +30,20 @@ interface VersandDialogProps {
   };
 }
 
+interface AusbuchungGruppe {
+  name: string
+  verantwortlicher: {
+    email: string
+    full_name: string
+  }[]
+  artikel: {
+    name: string
+    artikelnummer: string
+    menge: number
+    versandte_menge: number
+  }[]
+}
+
 export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDialogProps) {
   const queryClient = useQueryClient();
   const [mengen, setMengen] = useState<Record<string, number>>(() => 

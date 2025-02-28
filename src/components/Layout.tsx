@@ -27,6 +27,13 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+interface NavigationItem {
+  name: string
+  icon: React.ComponentType
+  href?: string
+  children?: NavigationItem[]
+}
+
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { user, isAdmin, userRole } = useAuth();
@@ -48,8 +55,8 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   // Navigation basierend auf der Benutzerrolle
-  const navigation = [
-    ...(isAdmin ? [{ name: 'Dashboard', href: '/dashboard', icon: HomeIcon }] : []),
+  const navigation: NavigationItem[] = [
+    ...(isAdmin ? [{ name: 'Dashboard', href: '/dashboard', icon: HomeIcon, children: [] }] : []),
     {
       name: 'Warenwirtschaft',
       icon: CubeIcon,

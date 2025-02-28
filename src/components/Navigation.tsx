@@ -44,9 +44,10 @@ const navigation = [
 
 const Navigation = () => {
   const { data: session } = useSession();
+  const userRole = session?.user?.role;
   
-  const showStandorte = session?.user?.role === 'ADMIN' || 
-                        session?.user?.role === 'STANDORT_VERANTWORTLICHER';
+  const showStandorte = userRole === 'ADMIN' || 
+                        userRole === 'STANDORT_VERANTWORTLICHER';
 
   return (
     <nav>
