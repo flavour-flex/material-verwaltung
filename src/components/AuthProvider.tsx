@@ -39,17 +39,17 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (status === 'loading') return;
+    if (status === 'loading') return;
 
-      if (!session) {
-        if (!router.pathname.startsWith('/login')) {
-          router.push('/login');
-        }
-        setAuthState(prev => ({ ...prev, isLoading: false }));
-        return;
+    if (!session) {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      if (router.pathname !== '/login' && router.pathname !== '/auth/set-password') {
+        router.replace('/login');
       }
+      return;
+    }
 
+    const fetchUserData = async () => {
       try {
         const { data: userData, error } = await supabase
           .from('users')
@@ -69,14 +69,17 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           isAuthenticated: true
         });
 
+        if (router.pathname === '/login') {
+          router.replace('/dashboard');
+        }
       } catch (error) {
         console.error('Error fetching user data:', error);
         setAuthState(prev => ({ ...prev, isLoading: false }));
       }
     };
 
-    initAuth();
-  }, [session, status, router]);
+    fetchUserData();
+  }, [session, status]);
 
   return (
     <AuthContext.Provider value={authState}>
