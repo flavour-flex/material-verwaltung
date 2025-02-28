@@ -132,10 +132,16 @@ export default function Layout({ children }: LayoutProps) {
             }
           ]
         },
+        
         {
-          name: 'Stammdaten',
-          icon: ArchiveBoxIcon,
+          name: 'Verwaltung',
+          icon: WrenchScrewdriverIcon,
           children: [
+            {
+              name: 'Hauptlager',
+              href: '/hauptlager',
+              icon: BuildingStorefrontIcon
+            },
             {
               name: 'Standorte',
               href: '/standorte',
@@ -145,18 +151,6 @@ export default function Layout({ children }: LayoutProps) {
               name: 'Artikel',
               href: '/artikel',
               icon: ArchiveBoxIcon
-            },
-
-          ]
-        },
-        {
-          name: 'Verwaltung',
-          icon: WrenchScrewdriverIcon,
-          children: [
-            {
-              name: 'Hauptlager',
-              href: '/hauptlager',
-              icon: BuildingStorefrontIcon
             },
             {
               name: 'Ausbuchungen',

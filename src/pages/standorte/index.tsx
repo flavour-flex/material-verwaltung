@@ -11,7 +11,12 @@ interface Standort {
   id: string;
   name: string;
   adresse: string;
-  verantwortliche: Array<{ email: string }>;
+  plz: string;
+  stadt: string;
+  verantwortliche: Array<{ 
+    email: string;
+    name: string;
+  }>;
   offene_bestellungen_count?: number;
   wareneingang_count?: number;
 }
@@ -105,7 +110,7 @@ export default function StandortePage() {
                     Verantwortliche
                   </th>
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                    Offene Bestellungen
+                    Status
                   </th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-0">
                     <span className="sr-only">Aktionen</span>
@@ -133,12 +138,40 @@ export default function StandortePage() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {standort.adresse}
+                      <div className="flex flex-col">
+                        <span>{standort.adresse}</span>
+                        <span>{standort.plz} {standort.stadt}</span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {Array.isArray(standort.verantwortliche) 
-                        ? standort.verantwortliche.map(v => v.email).join(', ')
-                        : ''}
+                    <td className="px-3 py-4 text-sm text-gray-500">
+                      <div className="flex flex-col space-y-1">
+                        {Array.isArray(standort.verantwortliche) && 
+                          standort.verantwortliche.map((v, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <a
+                                href={`mailto:${v.email}`}
+                                className="text-[#023770] hover:text-[#034694] hover:underline flex items-center"
+                                title={`Email an ${v.name} senden`}
+                              >
+                                <span>{v.name}</span>
+                                <svg 
+                                  className="h-4 w-4 ml-1" 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    strokeWidth={2} 
+                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" 
+                                  />
+                                </svg>
+                              </a>
+                            </div>
+                          ))
+                        }
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                       {(standort.offene_bestellungen_count > 0 || standort.wareneingang_count > 0) ? (
