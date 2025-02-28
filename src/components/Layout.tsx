@@ -13,7 +13,8 @@ import {
   ArchiveBoxIcon,
   ArrowUpTrayIcon,
   CodeBracketIcon,
-  CubeIcon
+  CubeIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -44,31 +45,38 @@ export default function Layout({ children }: LayoutProps) {
       // Zeige Loading-Toast
       const loadingToast = toast.loading('Abmelden...');
 
-      // Erst die Session beenden
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      // Dann den Cache leeren
-      queryClient.clear();
+      // Erst die Session holen
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // Toasts entfernen und Erfolgsmeldung zeigen
+      if (!session) {
+        // Wenn keine Session existiert, direkt zur Login-Seite
+        toast.dismiss(loadingToast);
+        window.location.href = '/login';
+        return;
+      }
+
+      // Cache leeren
+      queryClient.clear();
+
+      // Session beenden
+      await supabase.auth.signOut();
+
+      // Loading-Toast entfernen
       toast.dismiss(loadingToast);
       toast.success('Erfolgreich abgemeldet');
 
-      // Kurze Verzögerung für die Toasts
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Kurze Verzögerung für die Toast-Anzeige
+      setTimeout(() => {
+        // Zur Login-Seite navigieren
+        window.location.href = '/login';
+      }, 100);
 
-      // Seite neu laden und zur Login-Seite weiterleiten
-      window.location.replace('/login');
-      
     } catch (error) {
-      // Im Fehlerfall alle Toasts entfernen
-      toast.dismiss();
       console.error('Logout error:', error);
-      toast.error('Es gab ein Problem beim Abmelden');
-
-      // Trotzdem zur Login-Seite weiterleiten
-      window.location.replace('/login');
+      toast.error('Fehler beim Abmelden');
+      
+      // Im Fehlerfall trotzdem zur Login-Seite
+      window.location.href = '/login';
     }
   };
 
@@ -272,39 +280,13 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
 
                 <div className="hidden sm:ml-6 sm:flex sm:items-center">
-                  <Menu as="div" className="relative ml-3">
-                    <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#023770]">
-                      <span className="sr-only">Benutzermenü öffnen</span>
-                      <div className="h-8 w-8 rounded-full bg-[#023770]/10 flex items-center justify-center text-[#023770]">
-                        {user?.email?.charAt(0).toUpperCase()}
-                      </div>
-                    </Menu.Button>
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-200"
-                      enterFrom="transform opacity-0 scale-95"
-                      enterTo="transform opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
-                      leaveFrom="transform opacity-100 scale-100"
-                      leaveTo="transform opacity-0 scale-95"
-                    >
-                      <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        <Menu.Item>
-                          {({ active }) => (
-                            <button
-                              onClick={handleLogout}
-                              className={classNames(
-                                active ? 'bg-gray-100' : '',
-                                'block w-full px-4 py-2 text-left text-sm text-gray-700'
-                              )}
-                            >
-                              Abmelden
-                            </button>
-                          )}
-                        </Menu.Item>
-                      </Menu.Items>
-                    </Transition>
-                  </Menu>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#023770]/20 hover:text-white rounded-md"
+                  >
+                    <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                    Abmelden
+                  </button>
                 </div>
               </div>
             </div>

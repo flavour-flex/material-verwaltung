@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,13 +10,6 @@ export default function LoginPage() {
   const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      const redirectPath = isAdmin ? '/dashboard' : '/bestellungen/neu';
-      router.push(redirectPath);
-    }
-  }, [user, isAdmin, router]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,7 +32,10 @@ export default function LoginPage() {
 
       if (error) throw error;
 
-      toast.success('Erfolgreich angemeldet');
+      // Nach erfolgreichem Login manuell weiterleiten
+      const redirectPath = isAdmin ? '/dashboard' : '/bestellungen/neu';
+      window.location.href = redirectPath;
+
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Anmeldung fehlgeschlagen');
