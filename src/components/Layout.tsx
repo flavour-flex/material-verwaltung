@@ -54,8 +54,7 @@ export default function Layout({ children }: LayoutProps) {
     }
   };
 
-  // Navigation basierend auf der Benutzerrolle
-  const navigation: NavigationItem[] = [
+  const navigation = [
     {
       name: 'Dashboard',
       href: '/dashboard',
@@ -63,80 +62,21 @@ export default function Layout({ children }: LayoutProps) {
     },
     {
       name: 'Warenwirtschaft',
-      href: '/warenwirtschaft',
-      icon: CubeIcon,
+      icon: BuildingStorefrontIcon,
       children: [
-        {
-          name: 'Bestellungen',
-          href: '/bestellungen',
-          icon: ClipboardDocumentListIcon,
-          children: [
-            {
-              name: 'Bestellungen Übersicht',
-              href: '/bestellungen',
-              icon: ClipboardDocumentListIcon
-            },
-            {
-              name: 'Bestellung aufgeben',
-              href: '/bestellungen/neu',
-              icon: ShoppingCartIcon
-            }
-          ]
-        },
-        ...(isAdmin || userRole === 'standortverantwortlich' ? [
-          {
-            name: 'Stammdaten',
-            href: '/stammdaten',
-            icon: ArchiveBoxIcon,
-            children: [
-              {
-                name: 'Standorte',
-                href: '/standorte',
-                icon: BuildingOfficeIcon
-              },
-              ...(isAdmin ? [
-                {
-                  name: 'Artikel',
-                  href: '/artikel',
-                  icon: ArchiveBoxIcon
-                }
-              ] : [])
-            ]
-          }
-        ] : []),
-        ...(isAdmin ? [
-          {
-            name: 'Verwaltung',
-            href: '/verwaltung',
-            icon: WrenchScrewdriverIcon,
-            children: [
-              {
-                name: 'Bestellungen verwalten',
-                href: '/hauptlager',
-                icon: BuildingStorefrontIcon
-              },
-              {
-                name: 'Ausbuchungen',
-                href: '/ausbuchungen',
-                icon: ArrowUpTrayIcon
-              }
-            ]
-          }
-        ] : [])
-      ]
+        { name: 'Hauptlager', href: '/hauptlager' },
+        { name: 'Standorte', href: '/standorte' },
+        { name: 'Artikel', href: '/artikel' },
+        { name: 'Hardware', href: '/hardware' },
+        { name: 'Bestellungen', href: '/bestellungen' },
+        { name: 'Ausbuchungen', href: '/ausbuchungen' },
+      ],
     },
-    ...(isAdmin ? [
-      {
-        name: 'Einstellungen',
-        href: '/einstellungen',
-        icon: Cog6ToothIcon
-      },
-      {
-        name: 'API Dokumentation',
-        href: '/api-docs',
-        icon: CodeBracketIcon
-      }
-    ] : [])
+    {
+      name: 'Einstellungen',
+      href: '/einstellungen',
+      icon: Cog6ToothIcon,
+    },
   ];
 
   return (
