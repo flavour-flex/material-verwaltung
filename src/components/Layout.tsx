@@ -80,7 +80,7 @@ export default function Layout({ children }: LayoutProps) {
               icon: ShoppingCartIcon
             },
             {
-              name: 'Meine Bestellungen',
+              name: 'Meine Bestellunge',
               href: '/bestellungen',
               icon: ClipboardDocumentListIcon
             }
