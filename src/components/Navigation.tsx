@@ -19,7 +19,13 @@ interface CustomSession extends Session {
   };
 }
 
-const navigation = [
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}
+
+const navigation: NavigationItem[] = [
   {
     name: 'Dashboard',
     href: '/',

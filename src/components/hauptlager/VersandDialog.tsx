@@ -20,17 +20,17 @@ interface VersandDialogProps {
 }
 
 interface AusbuchungGruppe {
-  name: string
+  name: string;
   verantwortlicher: {
-    email: string
-    full_name: string
-  }[]
+    email: string;
+    full_name: string;
+  }[];
   artikel: {
-    name: string
-    artikelnummer: string
-    menge: number
-    versandte_menge: number
-  }[]
+    name: string;
+    artikelnummer: string;
+    menge: number;
+    versandte_menge: number;
+  }[];
 }
 
 export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDialogProps) {

@@ -28,10 +28,10 @@ interface LayoutProps {
 }
 
 interface NavigationItem {
-  name: string
-  icon: React.ComponentType
-  href?: string
-  children?: NavigationItem[]
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  children?: NavigationItem[];
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -56,13 +56,19 @@ export default function Layout({ children }: LayoutProps) {
 
   // Navigation basierend auf der Benutzerrolle
   const navigation: NavigationItem[] = [
-    ...(isAdmin ? [{ name: 'Dashboard', href: '/dashboard', icon: HomeIcon, children: [] }] : []),
+    {
+      name: 'Dashboard',
+      href: '/dashboard',
+      icon: HomeIcon,
+    },
     {
       name: 'Warenwirtschaft',
+      href: '/warenwirtschaft',
       icon: CubeIcon,
       children: [
         {
           name: 'Bestellungen',
+          href: '/bestellungen',
           icon: ClipboardDocumentListIcon,
           children: [
             {
@@ -80,6 +86,7 @@ export default function Layout({ children }: LayoutProps) {
         ...(isAdmin || userRole === 'standortverantwortlich' ? [
           {
             name: 'Stammdaten',
+            href: '/stammdaten',
             icon: ArchiveBoxIcon,
             children: [
               {
@@ -100,6 +107,7 @@ export default function Layout({ children }: LayoutProps) {
         ...(isAdmin ? [
           {
             name: 'Verwaltung',
+            href: '/verwaltung',
             icon: WrenchScrewdriverIcon,
             children: [
               {
