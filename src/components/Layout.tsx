@@ -29,7 +29,7 @@ interface LayoutProps {
 
 interface NavigationItem {
   name: string;
-  href?: string;
+  href: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   children?: NavigationItem[];
 }
@@ -217,10 +217,10 @@ export default function Layout({ children }: LayoutProps) {
                                                 <Menu.Item key={subChild.name}>
                                                   {({ active }) => (
                                                     <Link
-                                                      href={subChild.href}
+                                                      href={subChild.href || '#'}
                                                       className={classNames(
                                                         active ? 'bg-gray-100' : '',
-                                                        'block px-4 py-2 text-sm text-gray-700 rounded-md'
+                                                        'block px-4 py-2 text-sm text-gray-700'
                                                       )}
                                                     >
                                                       <span className="flex items-center">

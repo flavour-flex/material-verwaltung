@@ -50,7 +50,7 @@ export default function DashboardPage() {
           totalHardware: hardware.data?.length || 0,
           serviceNoetig: serviceData?.length || 0
         };
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error details:', {
           name: error.name,
           message: error.message,

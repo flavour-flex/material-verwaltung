@@ -5,11 +5,17 @@ import Layout from '@/components/Layout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
+import WareneingangSection from '@/components/standorte/WareneingangSection';
+import WarenbestandSection from '@/components/standorte/WarenbestandSection';
+import { useState } from 'react';
+
+type TabType = 'info' | 'wareneingang' | 'warenbestand';
 
 export default function StandortDetailPage() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('info');
 
   const { data: standort, isLoading } = useQuery({
     queryKey: ['standort', id],
@@ -92,27 +98,83 @@ export default function StandortDetailPage() {
         </div>
       </div>
 
-      <div className="mt-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Verantwortliche</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.isArray(standort?.verantwortliche) && standort.verantwortliche.length > 0 ? (
-            standort.verantwortliche.map((verantwortlicher, index) => (
-              <div 
-                key={`${verantwortlicher.email}-${index}`}
-                className="bg-gray-50 rounded-lg p-4"
-              >
-                <p className="font-medium">{verantwortlicher.name}</p>
-                <p className="text-gray-500">{verantwortlicher.email}</p>
-                {verantwortlicher.telefon && (
-                  <p className="text-gray-500">{verantwortlicher.telefon}</p>
-                )}
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500">Keine Verantwortlichen zugewiesen</p>
-          )}
-        </div>
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('info')}
+            className={`
+              ${activeTab === 'info' 
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }
+              whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium
+            `}
+          >
+            Informationen
+          </button>
+          <button
+            onClick={() => setActiveTab('wareneingang')}
+            className={`
+              ${activeTab === 'wareneingang'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }
+              whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium
+            `}
+          >
+            Wareneingang
+          </button>
+          <button
+            onClick={() => setActiveTab('warenbestand')}
+            className={`
+              ${activeTab === 'warenbestand'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }
+              whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium
+            `}
+          >
+            Warenbestand
+          </button>
+        </nav>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'info' && (
+        <div className="mt-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Verantwortliche</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.isArray(standort?.verantwortliche) && standort.verantwortliche.length > 0 ? (
+              standort.verantwortliche.map((verantwortlicher, index) => (
+                <div 
+                  key={`${verantwortlicher.email}-${index}`}
+                  className="bg-gray-50 rounded-lg p-4"
+                >
+                  <p className="font-medium">{verantwortlicher.name}</p>
+                  <p className="text-gray-500">{verantwortlicher.email}</p>
+                  {verantwortlicher.telefon && (
+                    <p className="text-gray-500">{verantwortlicher.telefon}</p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500">Keine Verantwortlichen zugewiesen</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'wareneingang' && (
+        <WareneingangSection 
+          standortId={standort.id} 
+          onWareneingangComplete={() => setActiveTab('warenbestand')} 
+        />
+      )}
+
+      {activeTab === 'warenbestand' && (
+        <WarenbestandSection standortId={standort.id} />
+      )}
     </Layout>
   );
 }
