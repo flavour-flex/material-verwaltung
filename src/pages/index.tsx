@@ -7,24 +7,63 @@ import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { isLoading: authChecking, user } = useAuth();
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const [bestellungen, hardware, anstehenderService] = await Promise.all([
-        supabase.from('bestellungen').select('status').eq('status', 'offen'),
-        supabase.from('hardware').select('id'),
-        supabase.from('hardware').select('id').lt('next_service', new Date().toISOString())
-      ]);
+      try {
+        const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        console.log('Formatted date:', currentDate); // Debug-Ausgabe
 
-      return {
-        offeneBestellungen: bestellungen.data?.length || 0,
-        totalHardware: hardware.data?.length || 0,
-        serviceNoetig: anstehenderService.data?.length || 0
-      };
-    }
+        const [bestellungen, hardware] = await Promise.all([
+          supabase.from('bestellungen').select('status').eq('status', 'offen'),
+          supabase.from('hardware').select('id'),
+        ]);
+
+        // Separate Hardware-Abfrage für besseres Debugging
+        console.log('Attempting service query with date:', currentDate);
+
+        const { data: serviceData, error: serviceError } = await supabase
+          .from('hardware')
+          .select('id, last_service')
+          .lt('last_service', currentDate);
+
+        if (serviceError) {
+          console.error('Service Query Error:', {
+            message: serviceError.message,
+            details: serviceError.details,
+            hint: serviceError.hint,
+            code: serviceError.code
+          });
+          throw serviceError;
+        }
+
+        console.log('Service Data:', {
+          count: serviceData?.length || 0,
+          firstFew: serviceData?.slice(0, 3),
+          dateExample: serviceData?.[0]?.last_service
+        });
+
+        return {
+          offeneBestellungen: bestellungen.data?.length || 0,
+          totalHardware: hardware.data?.length || 0,
+          serviceNoetig: serviceData?.length || 0
+        };
+      } catch (error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        return {
+          offeneBestellungen: 0,
+          totalHardware: 0,
+          serviceNoetig: 0
+        };
+      }
+    },
+    enabled: !authChecking && !!user
   });
 
   if (authChecking) {

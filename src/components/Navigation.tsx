@@ -6,6 +6,8 @@ import {
   ArrowUpTrayIcon,
   CodeBracketIcon
 } from '@heroicons/react/24/outline';
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 
 const navigation = [
   {
@@ -40,4 +42,27 @@ const navigation = [
   }
 ];
 
-// ... Rest der Komponente 
+const Navigation = () => {
+  const { data: session } = useSession();
+  
+  const showStandorte = session?.user?.role === 'ADMIN' || 
+                        session?.user?.role === 'STANDORT_VERANTWORTLICHER';
+
+  return (
+    <nav>
+      {navigation.map((item) => (
+        <Link key={item.name} href={item.href} className="menu-item">
+          {item.name}
+        </Link>
+      ))}
+      
+      {showStandorte && (
+        <Link href="/standorte" className="menu-item">
+          Standorte
+        </Link>
+      )}
+    </nav>
+  );
+};
+
+export default Navigation; 

@@ -7,6 +7,9 @@ import Layout from '@/components/Layout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast } from 'react-hot-toast';
 import { useEffect } from 'react';
+import UserManagement from '@/components/settings/UserManagement';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/router';
 
 const einstellungenSchema = z.object({
   hauptlager_email: z.string().email('Gültige E-Mail-Adresse erforderlich'),
@@ -20,7 +23,9 @@ const einstellungenSchema = z.object({
 
 type EinstellungenFormData = z.infer<typeof einstellungenSchema>;
 
-export default function EinstellungenPage() {
+export default function SettingsPage() {
+  const { user, isAdmin } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EinstellungenFormData>({
@@ -73,194 +78,214 @@ export default function EinstellungenPage() {
     updateEinstellungen.mutate({ [key]: value });
   };
 
+  useEffect(() => {
+    // Nur prüfen, wenn der Auth-Status bekannt ist
+    if (user && !isAdmin) {
+      router.push('/');
+    }
+  }, [user, isAdmin, router]);
+
+  // Zeige Loading während der Auth-Status geprüft wird
+  if (!user) {
+    return <LoadingSpinner />;
+  }
+
+  // Zeige nichts, wenn kein Admin
+  if (!isAdmin) {
+    return null;
+  }
+
   if (isLoading) return <LoadingSpinner />;
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Einstellungen</h1>
+      <div className="space-y-6">
+        <UserManagement />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-2xl font-semibold text-gray-900">Einstellungen</h1>
 
-        <div className="mt-8 max-w-3xl">
-          <div className="bg-white shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <div className="space-y-6">
-                {/* Hauptlager E-Mail */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Hauptlager E-Mail-Adresse
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="email"
-                      {...register('hauptlager_email')}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('hauptlager_email', data.hauptlager_email)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.hauptlager_email && (
-                    <p className="mt-2 text-sm text-red-600">{errors.hauptlager_email.message}</p>
-                  )}
-                </div>
-
-                {/* Service E-Mail */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Service E-Mail-Adresse
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="email"
-                      {...register('service_email')}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('service_email', data.service_email)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.service_email && (
-                    <p className="mt-2 text-sm text-red-600">{errors.service_email.message}</p>
-                  )}
-                </div>
-
-                {/* Service-Benachrichtigung */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Service-Benachrichtigung (Tage im Voraus)
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="number"
-                      {...register('service_benachrichtigung_tage', { valueAsNumber: true })}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('service_benachrichtigung_tage', data.service_benachrichtigung_tage)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.service_benachrichtigung_tage && (
-                    <p className="mt-2 text-sm text-red-600">{errors.service_benachrichtigung_tage.message}</p>
-                  )}
-                </div>
-
-                {/* Wechsel E-Mail */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Wechsel E-Mail-Adresse
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="email"
-                      {...register('wechsel_email')}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('wechsel_email', data.wechsel_email)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.wechsel_email && (
-                    <p className="mt-2 text-sm text-red-600">{errors.wechsel_email.message}</p>
-                  )}
-                </div>
-
-                {/* Wechsel-Benachrichtigung */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Wechsel-Benachrichtigung (Tage im Voraus)
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="number"
-                      {...register('wechsel_benachrichtigung_tage', { valueAsNumber: true })}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('wechsel_benachrichtigung_tage', data.wechsel_benachrichtigung_tage)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.wechsel_benachrichtigung_tage && (
-                    <p className="mt-2 text-sm text-red-600">{errors.wechsel_benachrichtigung_tage.message}</p>
-                  )}
-                </div>
-
-                {/* Mindestbestand E-Mail */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Mindestbestand E-Mail-Adresse
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="email"
-                      {...register('mindestbestand_email')}
-                      className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit((data) => 
-                        handleUpdateSingle('mindestbestand_email', data.mindestbestand_email)
-                      )()}
-                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Speichern
-                    </button>
-                  </div>
-                  {errors.mindestbestand_email && (
-                    <p className="mt-2 text-sm text-red-600">{errors.mindestbestand_email.message}</p>
-                  )}
-                </div>
-
-                {/* Mindestbestand-Benachrichtigung */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      {...register('mindestbestand_benachrichtigung')}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <label className="ml-2 block text-sm text-gray-900">
-                      Benachrichtigung bei Unterschreitung des Mindestbestands
+          <div className="mt-8 max-w-3xl">
+            <div className="bg-white shadow sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="space-y-6">
+                  {/* Hauptlager E-Mail */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Hauptlager E-Mail-Adresse
                     </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="email"
+                        {...register('hauptlager_email')}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('hauptlager_email', data.hauptlager_email)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.hauptlager_email && (
+                      <p className="mt-2 text-sm text-red-600">{errors.hauptlager_email.message}</p>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSubmit((data) => 
-                      handleUpdateSingle('mindestbestand_benachrichtigung', data.mindestbestand_benachrichtigung)
-                    )()}
-                    className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Speichern
-                  </button>
+
+                  {/* Service E-Mail */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Service E-Mail-Adresse
+                    </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="email"
+                        {...register('service_email')}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('service_email', data.service_email)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.service_email && (
+                      <p className="mt-2 text-sm text-red-600">{errors.service_email.message}</p>
+                    )}
+                  </div>
+
+                  {/* Service-Benachrichtigung */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Service-Benachrichtigung (Tage im Voraus)
+                    </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="number"
+                        {...register('service_benachrichtigung_tage', { valueAsNumber: true })}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('service_benachrichtigung_tage', data.service_benachrichtigung_tage)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.service_benachrichtigung_tage && (
+                      <p className="mt-2 text-sm text-red-600">{errors.service_benachrichtigung_tage.message}</p>
+                    )}
+                  </div>
+
+                  {/* Wechsel E-Mail */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Wechsel E-Mail-Adresse
+                    </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="email"
+                        {...register('wechsel_email')}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('wechsel_email', data.wechsel_email)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.wechsel_email && (
+                      <p className="mt-2 text-sm text-red-600">{errors.wechsel_email.message}</p>
+                    )}
+                  </div>
+
+                  {/* Wechsel-Benachrichtigung */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Wechsel-Benachrichtigung (Tage im Voraus)
+                    </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="number"
+                        {...register('wechsel_benachrichtigung_tage', { valueAsNumber: true })}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('wechsel_benachrichtigung_tage', data.wechsel_benachrichtigung_tage)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.wechsel_benachrichtigung_tage && (
+                      <p className="mt-2 text-sm text-red-600">{errors.wechsel_benachrichtigung_tage.message}</p>
+                    )}
+                  </div>
+
+                  {/* Mindestbestand E-Mail */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Mindestbestand E-Mail-Adresse
+                    </label>
+                    <div className="mt-1 flex rounded-md shadow-sm">
+                      <input
+                        type="email"
+                        {...register('mindestbestand_email')}
+                        className="flex-1 min-w-0 block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit((data) => 
+                          handleUpdateSingle('mindestbestand_email', data.mindestbestand_email)
+                        )()}
+                        className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    {errors.mindestbestand_email && (
+                      <p className="mt-2 text-sm text-red-600">{errors.mindestbestand_email.message}</p>
+                    )}
+                  </div>
+
+                  {/* Mindestbestand-Benachrichtigung */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        {...register('mindestbestand_benachrichtigung')}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <label className="ml-2 block text-sm text-gray-900">
+                        Benachrichtigung bei Unterschreitung des Mindestbestands
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit((data) => 
+                        handleUpdateSingle('mindestbestand_benachrichtigung', data.mindestbestand_benachrichtigung)
+                      )()}
+                      className="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Speichern
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

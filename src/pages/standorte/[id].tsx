@@ -12,10 +12,12 @@ import { useState } from 'react';
 import AusbuchenDialog from '@/components/standorte/AusbuchenDialog';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function StandortDetailPage() {
   const router = useRouter();
   const { id } = router.query;
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [isAusbuchenOpen, setIsAusbuchenOpen] = useState(false);
 
@@ -25,26 +27,26 @@ export default function StandortDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('standorte')
-        .select(`
-          id,
-          name,
-          adresse,
-          plz,
-          stadt,
-          land,
-          verantwortliche
-        `)
+        .select('*')
         .eq('id', id)
         .single();
       
       if (error) throw error;
+
+      // Prüfe Berechtigung
+      if (!isAdmin) {
+        const isResponsible = data.verantwortliche?.some(
+          (v: any) => v.email === user?.email
+        );
+        if (!isResponsible) {
+          router.push('/bestellungen/neu');
+          return null;
+        }
+      }
+      
       return data;
     },
-    enabled: !!id,
-    onError: (error) => {
-      toast.error('Fehler beim Laden des Standorts');
-      console.error('Standort Fehler:', error);
-    },
+    enabled: !!id && !!user
   });
 
   // Hardware am Standort laden
@@ -249,27 +251,34 @@ export default function StandortDetailPage() {
           </div>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
-          <Link
-            href={`/standorte/${id as string}/bearbeiten`}
-            className="ml-3 inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
-          >
-            Bearbeiten
-          </Link>
+          {/* Ausbuchen Button - für alle sichtbar */}
           <button
             onClick={() => setIsAusbuchenOpen(true)}
-            className="ml-3 inline-flex items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700"
+            className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
           >
             Ausbuchen
           </button>
-          <button
-            onClick={() => queryClient.refetchQueries({ 
-              queryKey: ['standort-warenbestand', id],
-              type: 'active'
-            })}
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Warenbestand aktualisieren
-          </button>
+
+          {/* Bearbeiten und Warenbestand nur für Admins */}
+          {isAdmin && (
+            <>
+              <Link
+                href={`/standorte/${id}/bearbeiten`}
+                className="ml-3 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              >
+                Bearbeiten
+              </Link>
+              <button
+                onClick={() => queryClient.refetchQueries({ 
+                  queryKey: ['standort-warenbestand', id],
+                  type: 'active'
+                })}
+                className="ml-3 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+              >
+                Warenbestand aktualisieren
+              </button>
+            </>
+          )}
         </div>
       </div>
 

@@ -7,24 +7,75 @@ import type { BestellPosition, Standort } from '@/types';
 import { sendBestellungEmail } from '@/lib/email';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 
 export default function NeueBestellungPage() {
   const router = useRouter();
-  const { standortId } = router.query; // Optional: Vorausgewählter Standort
+  const { standortId } = router.query;
+  const { user, userRole, isAdmin } = useAuth();
 
-  // Standorte laden
-  const { data: standorte, isLoading } = useQuery<Standort[]>({
+  // Debug-Ausgaben
+  console.log('User Role:', userRole);
+  console.log('Is Admin:', isAdmin);
+  console.log('User Email:', user?.email);
+
+  // Standorte abrufen
+  const { data: standorte, isLoading } = useQuery({
     queryKey: ['standorte'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('standorte')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
+      console.log('Fetching standorte as:', { userRole, isAdmin });
+
+      // Für Admins alle Standorte abrufen
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('standorte')
+          .select('*')
+          .order('name');
+
+        if (error) {
+          console.error('Standorte fetch error:', error);
+          throw error;
+        }
+
+        return data;
+      }
+
+      // Für Standortverantwortliche
+      if (user?.email) {
+        // PostgreSQL JSON-Abfrage für Array von Objekten
+        const { data, error } = await supabase
+          .from('standorte')
+          .select('*')
+          .filter('verantwortliche', 'cs', `[{"email": "${user.email}"}]`)
+          .order('name');
+
+        if (error) {
+          console.error('Standorte fetch error:', error);
+          throw error;
+        }
+
+        console.log('Found standorte:', data);
+        return data;
+      }
+
+      return [];
     },
+    enabled: !!user
   });
+
+  // Zugriffskontrolle
+  useEffect(() => {
+    if (standortId && userRole === 'standortverantwortlich') {
+      // Prüfen ob der Benutzer für diesen Standort verantwortlich ist
+      const hasAccess = standorte?.some(s => s.id === standortId);
+      if (!hasAccess) {
+        toast.error('Keine Berechtigung für diesen Standort');
+        router.push('/bestellungen/neu');
+      }
+    }
+    // Keine Prüfung für Admins - sie haben Zugriff auf alle Standorte
+  }, [standortId, standorte, userRole]);
 
   if (isLoading) return <LoadingSpinner />;
 
