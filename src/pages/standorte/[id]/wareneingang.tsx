@@ -1,10 +1,10 @@
 import { useRouter } from 'next/router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
+import { supabase } from '@/lib/supabase';
+import Layout from '@/components/Layout';
 import { toast } from 'react-hot-toast';
-import { queryClient } from '../../lib/queryClient';
+import { queryClient } from '@/lib/queryClient';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 
