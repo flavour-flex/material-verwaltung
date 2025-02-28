@@ -280,6 +280,11 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
 
                 <div className="hidden sm:ml-6 sm:flex sm:items-center">
+                  <div className="flex items-center mr-4 text-gray-300">
+                    <span className="text-sm">{user?.email}</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-sm capitalize">{userRole || 'Benutzer'}</span>
+                  </div>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-[#023770]/20 hover:text-white rounded-md"

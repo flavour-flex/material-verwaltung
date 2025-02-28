@@ -12,51 +12,99 @@ export default function StandortBearbeitenPage() {
   const { id } = router.query;
   const queryClient = useQueryClient();
 
+  // Debug-Log für Router und ID
+  console.debug('Router state:', { pathname: router.pathname, query: router.query });
+
   // Standort-Daten laden
-  const { data: standort, isLoading } = useQuery<Standort>({
+  const { data: standort, isLoading, error: loadError } = useQuery<Standort>({
     queryKey: ['standort', id],
     queryFn: async () => {
+      console.debug('Fetching standort data for ID:', id);
+
       const { data, error } = await supabase
         .from('standorte')
         .select('*')
         .eq('id', id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching standort:', error);
+        toast.error(`Fehler beim Laden des Standorts: ${error.message}`);
+        throw error;
+      }
+
+      console.debug('Fetched standort data:', data);
       return data;
     },
     enabled: !!id,
+    retry: 2,
+    onError: (error) => {
+      console.error('Query error:', error);
+      toast.error('Standort konnte nicht geladen werden');
+    }
   });
 
   // Mutation für das Aktualisieren des Standorts
   const updateStandort = useMutation({
     mutationFn: async (data: StandortFormData) => {
-      const { error } = await supabase
-        .from('standorte')
-        .update(data)
-        .eq('id', id);
-      
-      if (error) throw error;
+      console.debug('Updating standort with data:', data);
+
+      // Validierung der PLZ
+      if (data.plz && !/^\d{5}$/.test(data.plz)) {
+        throw new Error('PLZ muss aus 5 Ziffern bestehen');
+      }
+
+      const toastId = toast.loading('Standort wird aktualisiert...');
+
+      try {
+        const { error } = await supabase
+          .from('standorte')
+          .update(data)
+          .eq('id', id);
+        
+        if (error) {
+          console.error('Update error:', error);
+          toast.error(`Fehler beim Aktualisieren: ${error.message}`, {
+            id: toastId
+          });
+          throw error;
+        }
+
+        // Cache invalidieren
+        await Promise.all([
+          queryClient.invalidateQueries(['standorte']),
+          queryClient.invalidateQueries(['standort', id])
+        ]);
+
+        console.debug('Standort successfully updated');
+        toast.success('Standort erfolgreich aktualisiert', {
+          id: toastId
+        });
+
+        // Kurze Verzögerung für die Cache-Aktualisierung
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Weiterleitung mit Error-Handling
+        try {
+          await router.push(`/standorte/${id}`);
+        } catch (routerError) {
+          console.error('Navigation error:', routerError);
+          // Fallback zur harten Navigation
+          window.location.href = `/standorte/${id}`;
+        }
+
+      } catch (error) {
+        // Toast ID wird in der äußeren catch-Block behandelt
+        throw error;
+      }
     },
-    onSuccess: () => {
-      // Cache invalidieren
-      queryClient.invalidateQueries(['standorte']);
-      queryClient.invalidateQueries(['standort', id]);
-      
-      // Erfolgsmeldung
-      toast.success('Standort erfolgreich aktualisiert');
-      
-      // Kurze Verzögerung für die Cache-Aktualisierung
-      setTimeout(() => {
-        router.push(`/standorte/${id}`);
-      }, 100);
-    },
-    onError: (error) => {
-      console.error('Update error:', error);
-      toast.error('Fehler beim Aktualisieren des Standorts');
-    },
+    onError: (error: any) => {
+      console.error('Mutation error:', error);
+      toast.error(error.message || 'Fehler beim Aktualisieren des Standorts');
+    }
   });
 
+  // Loading-Zustand
   if (isLoading) {
     return (
       <Layout>
@@ -65,6 +113,29 @@ export default function StandortBearbeitenPage() {
     );
   }
 
+  // Error-Zustand
+  if (loadError) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <h3 className="text-lg font-medium text-red-600">
+            Fehler beim Laden des Standorts
+          </h3>
+          <p className="mt-2 text-sm text-gray-500">
+            Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support.
+          </p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Zurück
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Nicht gefunden
   if (!standort) {
     return (
       <Layout>
@@ -72,6 +143,12 @@ export default function StandortBearbeitenPage() {
           <h3 className="text-lg font-medium text-gray-900">
             Standort nicht gefunden
           </h3>
+          <button
+            onClick={() => router.push('/standorte')}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Zur Übersicht
+          </button>
         </div>
       </Layout>
     );
