@@ -35,100 +35,73 @@ interface AusbuchungGruppe {
 
 export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDialogProps) {
   const queryClient = useQueryClient();
-  const [mengen, setMengen] = useState<Record<string, number>>(() => 
-    Object.fromEntries(bestellung.bestellung_artikel.map(pos => [pos.id, pos.menge]))
-  );
-  const [versandTyp, setVersandTyp] = useState<'vollstaendig' | 'teillieferung'>('vollstaendig');
+  const [versandTyp, setVersandTyp] = useState<'vollstaendig' | 'teilweise'>('vollstaendig');
+  const [mengen, setMengen] = useState<Record<string, number>>({});
 
   const updateBestellung = useMutation({
     mutationFn: async () => {
+      // Session holen
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Nicht authentifiziert');
+
       const zuVerwendeneMengen = versandTyp === 'vollstaendig' 
         ? bestellung.bestellung_artikel.map(pos => ({
             artikel_id: pos.artikel_id,
-            menge: pos.menge,
             versandte_menge: pos.menge
           }))
-        : Object.entries(mengen).map(([id, menge]) => {
-            const position = bestellung.bestellung_artikel.find(p => p.id === id);
-            return {
-              artikel_id: position!.artikel_id,
-              menge,
-              versandte_menge: menge
-            };
-          });
+        : Object.entries(mengen).map(([artikel_id, versandte_menge]) => ({
+            artikel_id,
+            versandte_menge
+          }));
 
-      // Start a Supabase transaction
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht authentifiziert');
+      // Erst die bestellung_artikel aktualisieren
+      for (const pos of bestellung.bestellung_artikel) {
+        const versandte_menge = zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.versandte_menge || 0;
+        
+        const { error: updateError } = await supabase
+          .from('bestellung_artikel')
+          .update({ versandte_menge })
+          .eq('id', pos.id);
 
-      if (versandTyp === 'teillieferung') {
-        // Update die Mengen in der bestellung_artikel Tabelle
-        for (const pos of bestellung.bestellung_artikel) {
-          const versandteMenge = zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.versandte_menge;
-          
-          if (!pos.id) {
-            throw new Error(`Keine ID für Artikel ${pos.artikel.name} gefunden`);
-          }
-
-          if (versandteMenge < 0 || versandteMenge > pos.menge) {
-            throw new Error(`Ungültige Menge für Artikel ${pos.artikel.name}`);
-          }
-
-          const { error: updateError } = await supabase
-            .from('bestellung_artikel')
-            .update({ 
-              versandte_menge: versandteMenge
-            })
-            .eq('id', pos.id);
-
-          if (updateError) {
-            console.error('Update error for artikel:', pos, updateError);
-            throw updateError;
-          }
-        }
+        if (updateError) throw updateError;
       }
 
-      // Update den Bestellstatus
-      const { data: updatedBestellung, error: bestellungError } = await supabase
+      // Dann den Bestellstatus aktualisieren
+      const { data: updatedBestellung, error: updateError } = await supabase
         .from('bestellungen')
-        .update({ 
-          status: versandTyp === 'vollstaendig' ? 'versendet' : 'teilweise_versendet',
-          versand_datum: new Date().toISOString(),
-          versender_id: user?.id
+        .update({
+          status: versandTyp === 'vollstaendig' ? 'versendet' : 'teilweise_versendet'
         })
         .eq('id', bestellung.id)
         .select(`
           id,
-          standort:standort_id (
+          status,
+          standort_id,
+          standorte!inner (
             name,
             verantwortliche
           ),
-          bestellung_artikel (
-            artikel:artikel_id (
+          bestellung_artikel!inner (
+            id,
+            artikel_id,
+            menge,
+            versandte_menge,
+            artikel!inner (
               name,
               artikelnummer
-            ),
-            menge,
-            versandte_menge
+            )
           )
         `)
         .single();
 
-      if (bestellungError) throw bestellungError;
+      if (updateError) throw updateError;
 
-      // Email an alle Verantwortlichen senden
-      if (updatedBestellung.standort.verantwortliche) {
-        for (const verantwortlicher of updatedBestellung.standort.verantwortliche) {
+      // Email-Versand...
+      if (updatedBestellung.standorte?.verantwortliche) {
+        for (const verantwortlicher of updatedBestellung.standorte.verantwortliche) {
           await sendBestellungVersendetEmail({
             ...updatedBestellung,
-            artikel: updatedBestellung.bestellung_artikel.map(pos => ({
-              ...pos,
-              versandte_menge: zuVerwendeneMengen.find(m => m.artikel_id === pos.artikel_id)?.versandte_menge || 0
-            })),
-            standort: {
-              ...updatedBestellung.standort,
-              verantwortlicher
-            }
+            standort: updatedBestellung.standorte
           });
         }
       }
@@ -145,9 +118,9 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
       onClose();
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Fehler beim Aktualisieren der Bestellung');
       console.error('Versand error:', error);
-    },
+      toast.error(error.message || 'Fehler beim Aktualisieren der Bestellung');
+    }
   });
 
   const handleMengeChange = (artikelId: string, menge: number) => {
@@ -205,9 +178,9 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
                         </button>
                         <button
                           type="button"
-                          onClick={() => setVersandTyp('teillieferung')}
+                          onClick={() => setVersandTyp('teilweise')}
                           className={`px-4 py-2 rounded-md ${
-                            versandTyp === 'teillieferung' 
+                            versandTyp === 'teilweise' 
                               ? 'bg-indigo-600 text-white' 
                               : 'bg-gray-100 text-gray-700'
                           }`}
@@ -231,7 +204,7 @@ export default function VersandDialog({ isOpen, onClose, bestellung }: VersandDi
                                   {pos.artikel.name}
                                 </td>
                                 <td className="whitespace-nowrap py-4 pr-3">
-                                  {versandTyp === 'teillieferung' ? (
+                                  {versandTyp === 'teilweise' ? (
                                     <input
                                       type="number"
                                       value={mengen[pos.id]}

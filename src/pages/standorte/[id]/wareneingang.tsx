@@ -11,6 +11,7 @@ import { useState } from 'react';
 export default function WareneingangPage() {
   const router = useRouter();
   const { id: standortId } = router.query;
+  const [mengen, setMengen] = useState<Record<string, number>>({});
 
   const { data: bestellungen } = useQuery({
     queryKey: ['bestellungen', standortId],
@@ -38,10 +39,28 @@ export default function WareneingangPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Initialisiere die Mengen für jede Position
+      const initialMengen: Record<string, number> = {};
+      data?.forEach(bestellung => {
+        bestellung.bestellung_artikel.forEach(position => {
+          // Setze die initiale Menge auf die versandte_menge, falls vorhanden
+          initialMengen[position.artikel_id] = position.versandte_menge || position.menge;
+        });
+      });
+      setMengen(initialMengen);
+      
       return data;
     },
     enabled: !!standortId
   });
+
+  const handleMengeChange = (artikelId: string, menge: number) => {
+    setMengen(prev => ({
+      ...prev,
+      [artikelId]: menge
+    }));
+  };
 
   const createWareneingang = useMutation({
     mutationFn: async (data: WareneingangData) => {
@@ -52,7 +71,8 @@ export default function WareneingangPage() {
         throw new Error('Artikel nicht gefunden');
       }
 
-      const maxEinbuchbareMenge = position.versandte_menge || 0;
+      // Verwende die versandte_menge falls vorhanden, sonst die ursprüngliche Menge
+      const maxEinbuchbareMenge = position.versandte_menge ?? position.menge;
       
       if (data.menge > maxEinbuchbareMenge) {
         throw new Error(`Es können maximal ${maxEinbuchbareMenge} Stück eingebucht werden`);
@@ -82,15 +102,6 @@ export default function WareneingangPage() {
       toast.error(error.message || 'Fehler beim Buchen des Wareneingangs');
     }
   });
-
-  const [mengen, setMengen] = useState<Record<string, number>>({});
-
-  const handleMengeChange = (artikelId: string, menge: number) => {
-    setMengen(prev => ({
-      ...prev,
-      [artikelId]: menge
-    }));
-  };
 
   return (
     <Layout>

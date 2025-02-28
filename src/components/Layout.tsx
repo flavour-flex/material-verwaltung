@@ -41,32 +41,33 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleLogout = async () => {
     try {
+      // Zeige Loading-Toast
       const loadingToast = toast.loading('Abmelden...');
-      
-      // Supabase Logout
+
+      // Erst die Session beenden
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      // Cache leeren
+      // Dann den Cache leeren
       queryClient.clear();
       
-      // Toast entfernen und Erfolgsmeldung
+      // Toasts entfernen und Erfolgsmeldung zeigen
       toast.dismiss(loadingToast);
-      
-      // Kurze Verzögerung für die Erfolgsmeldung
-      await new Promise(resolve => setTimeout(resolve, 500));
       toast.success('Erfolgreich abgemeldet');
 
-      // Kurze Verzögerung für die Weiterleitung
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Harte Weiterleitung mit window.location.replace
+      // Kurze Verzögerung für die Toasts
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Seite neu laden und zur Login-Seite weiterleiten
       window.location.replace('/login');
       
     } catch (error) {
-      console.error('Logout error:', error);
+      // Im Fehlerfall alle Toasts entfernen
       toast.dismiss();
+      console.error('Logout error:', error);
       toast.error('Es gab ein Problem beim Abmelden');
+
+      // Trotzdem zur Login-Seite weiterleiten
       window.location.replace('/login');
     }
   };
