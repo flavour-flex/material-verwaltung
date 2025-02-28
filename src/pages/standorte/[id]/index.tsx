@@ -1,1 +1,0 @@
-// Diese Datei löschen, da wir bereits [id].tsx haben 
