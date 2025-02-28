@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useSession } from 'next-auth/react';
 import { supabase } from '@/lib/supabase';
 
 interface AuthState {
@@ -23,11 +22,8 @@ export const AuthContext = createContext<AuthState>({
   isAuthenticated: false,
 });
 
-export const useAuth = () => useContext(AuthContext);
-
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
-  const { data: session, status } = useSession();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     userRole: null,
@@ -39,22 +35,22 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   useEffect(() => {
-    if (status === 'loading') return;
-
-    if (!session) {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-      if (router.pathname !== '/login' && router.pathname !== '/auth/set-password') {
-        router.replace('/login');
-      }
-      return;
-    }
-
     const fetchUserData = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          setAuthState(prev => ({ ...prev, isLoading: false }));
+          if (router.pathname !== '/login' && router.pathname !== '/auth/set-password') {
+            router.replace('/login');
+          }
+          return;
+        }
+
         const { data: userData, error } = await supabase
           .from('users')
           .select('*')
-          .eq('email', session.user?.email)
+          .eq('id', session.user.id)
           .single();
 
         if (error) throw error;
@@ -79,7 +75,13 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     fetchUserData();
-  }, [session, status]);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(fetchUserData);
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   return (
     <AuthContext.Provider value={authState}>

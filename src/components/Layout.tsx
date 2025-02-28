@@ -41,16 +41,33 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleLogout = async () => {
     try {
+      const loadingToast = toast.loading('Abmelden...');
+      
+      // Supabase Logout
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
+      // Cache leeren
       queryClient.clear();
-      await new Promise(resolve => setTimeout(resolve, 100));
-      window.location.href = '/login';
+      
+      // Toast entfernen und Erfolgsmeldung
+      toast.dismiss(loadingToast);
+      
+      // Kurze Verzögerung für die Erfolgsmeldung
+      await new Promise(resolve => setTimeout(resolve, 500));
       toast.success('Erfolgreich abgemeldet');
+
+      // Kurze Verzögerung für die Weiterleitung
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Harte Weiterleitung mit window.location.replace
+      window.location.replace('/login');
+      
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('Fehler beim Abmelden');
+      toast.dismiss();
+      toast.error('Es gab ein Problem beim Abmelden');
+      window.location.replace('/login');
     }
   };
 
@@ -80,7 +97,7 @@ export default function Layout({ children }: LayoutProps) {
               icon: ShoppingCartIcon
             },
             {
-              name: 'Meine Bestellunge',
+              name: 'Meine Bestellungen',
               href: '/bestellungen',
               icon: ClipboardDocumentListIcon
             }
