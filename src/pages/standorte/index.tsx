@@ -4,38 +4,64 @@ import Layout from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Link from 'next/link';
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
+
+interface Standort {
+  id: string;
+  name: string;
+  adresse: string;
+  verantwortliche: Array<{ email: string }>;
+  offene_bestellungen_count?: number;
+  wareneingang_count?: number;
+}
 
 export default function StandortePage() {
   const { user, userRole, isAdmin } = useAuth();
 
-  // Standorte abrufen
   const { data: standorte, isLoading } = useQuery({
-    queryKey: ['standorte'],
+    queryKey: ['standorte-mit-bestellungen'],
     queryFn: async () => {
-      // Für Admins alle Standorte abrufen
-      if (isAdmin) {
-        const { data, error } = await supabase
-          .from('standorte')
-          .select('*')
-          .order('name');
+      let query = supabase
+        .from('standorte')
+        .select(`
+          *,
+          bestellungen!standort_id(
+            id,
+            status
+          )
+        `)
+        .order('name');
 
-        if (error) throw error;
-        return data;
+      // Für nicht-Admins nur zugewiesene Standorte
+      if (!isAdmin && user?.email) {
+        query = query.filter('verantwortliche', 'cs', `[{"email": "${user.email}"}]`);
       }
 
-      // Für Standortverantwortliche nur zugewiesene Standorte
-      if (user?.email) {
-        const { data, error } = await supabase
-          .from('standorte')
-          .select('*')
-          .filter('verantwortliche', 'cs', `[{"email": "${user.email}"}]`)
-          .order('name');
+      const { data, error } = await query;
 
-        if (error) throw error;
-        return data;
+      if (error) {
+        console.error('Fehler beim Laden der Standorte:', error);
+        throw error;
       }
 
-      return [];
+      // Bestellungen zählen
+      return data?.map(standort => {
+        const offeneBestellungen = standort.bestellungen?.filter(
+          (b: any) => b.status === 'offen'
+        ).length || 0;
+
+        // Zähle Bestellungen im Wareneingang (versendet oder teilweise_versendet)
+        const wareneingaenge = standort.bestellungen?.filter(
+          (b: any) => b.status === 'versendet' || b.status === 'teilweise_versendet'
+        ).length || 0;
+
+        return {
+          ...standort,
+          offene_bestellungen_count: offeneBestellungen,
+          wareneingang_count: wareneingaenge
+        };
+      }) || [];
     },
     enabled: !!user
   });
@@ -78,16 +104,33 @@ export default function StandortePage() {
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                     Verantwortliche
                   </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Offene Bestellungen
+                  </th>
                   <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-0">
                     <span className="sr-only">Aktionen</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {standorte?.map((standort) => (
+                {standorte?.map((standort: Standort) => (
                   <tr key={standort.id}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
-                      {standort.name}
+                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                      <div className="flex items-center">
+                        {standort.offene_bestellungen_count > 0 && (
+                          <motion.div
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="mr-2"
+                          >
+                            <ExclamationCircleIcon 
+                              className="h-5 w-5 text-yellow-500" 
+                              title={`${standort.offene_bestellungen_count} offene Bestellung(en)`}
+                            />
+                          </motion.div>
+                        )}
+                        <span className="font-medium text-gray-900">{standort.name}</span>
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                       {standort.adresse}
@@ -97,10 +140,30 @@ export default function StandortePage() {
                         ? standort.verantwortliche.map(v => v.email).join(', ')
                         : ''}
                     </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      {(standort.offene_bestellungen_count > 0 || standort.wareneingang_count > 0) ? (
+                        <div className="space-y-1">
+                          {standort.offene_bestellungen_count > 0 && (
+                            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                              {standort.offene_bestellungen_count} offene Bestellung(en)
+                            </span>
+                          )}
+                          {standort.wareneingang_count > 0 && (
+                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                              {standort.wareneingang_count} Bestellung(en) im Wareneingang
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                          Keine
+                        </span>
+                      )}
+                    </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                       <Link 
                         href={`/standorte/${standort.id}`} 
-                        className="text-indigo-600 hover:text-indigo-900"
+                        className="text-[#023770] hover:text-[#034694]"
                       >
                         Details
                       </Link>

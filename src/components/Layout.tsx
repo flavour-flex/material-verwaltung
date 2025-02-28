@@ -146,11 +146,7 @@ export default function Layout({ children }: LayoutProps) {
               href: '/artikel',
               icon: ArchiveBoxIcon
             },
-            {
-              name: 'Hardware',
-              href: '/hardware',
-              icon: WrenchScrewdriverIcon
-            }
+
           ]
         },
         {

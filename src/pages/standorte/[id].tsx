@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import Layout from '@/components/Layout';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -8,6 +8,9 @@ import Link from 'next/link';
 import WareneingangSection from '@/components/standorte/WareneingangSection';
 import WarenbestandSection from '@/components/standorte/WarenbestandSection';
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
+import { TrashIcon } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
 
 type TabType = 'info' | 'wareneingang' | 'warenbestand';
 
@@ -15,7 +18,9 @@ export default function StandortDetailPage() {
   const router = useRouter();
   const { id } = router.query;
   const { user, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [isCheckingUsage, setIsCheckingUsage] = useState(false);
 
   const { data: standort, isLoading } = useQuery({
     queryKey: ['standort', id],
@@ -43,6 +48,53 @@ export default function StandortDetailPage() {
     },
     enabled: !!id && !!user
   });
+
+  // Mutation zum Löschen des Standorts
+  const deleteStandort = useMutation({
+    mutationFn: async () => {
+      setIsCheckingUsage(true);
+      
+      try {
+        // Prüfen ob Artikel jemals gebucht wurden
+        const { data: buchungen, error: buchungenError } = await supabase
+          .from('ausbuchungen')
+          .select('id')
+          .eq('standort_id', id)
+          .limit(1);
+
+        if (buchungenError) throw buchungenError;
+
+        if (buchungen && buchungen.length > 0) {
+          throw new Error('Dieser Standort wurde bereits verwendet und kann nicht gelöscht werden.');
+        }
+
+        // Wenn keine Buchungen gefunden wurden, Standort löschen
+        const { error: deleteError } = await supabase
+          .from('standorte')
+          .delete()
+          .eq('id', id);
+
+        if (deleteError) throw deleteError;
+
+      } finally {
+        setIsCheckingUsage(false);
+      }
+    },
+    onSuccess: () => {
+      toast.success('Standort erfolgreich gelöscht');
+      queryClient.invalidateQueries(['standorte']);
+      router.push('/standorte');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Fehler beim Löschen des Standorts');
+    }
+  });
+
+  const handleDelete = async () => {
+    if (window.confirm('Sind Sie sicher, dass Sie diesen Standort löschen möchten?')) {
+      deleteStandort.mutate();
+    }
+  };
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -174,6 +226,45 @@ export default function StandortDetailPage() {
 
       {activeTab === 'warenbestand' && (
         <WarenbestandSection standortId={standort.id} />
+      )}
+
+      {/* Lösch-Button (nur für Admins) */}
+      {isAdmin && (
+        <div className="mt-6 border-t border-gray-200 pt-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleDelete}
+                disabled={isCheckingUsage || deleteStandort.isLoading}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+              >
+                <TrashIcon className="mr-2 h-4 w-4" />
+                Standort löschen
+              </button>
+              
+              {/* Überprüfungs-Animation */}
+              {isCheckingUsage && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center text-sm text-gray-500"
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="mr-2 h-4 w-4 border-2 border-gray-300 border-t-gray-600 rounded-full"
+                  />
+                  Überprüfe Verwendung...
+                </motion.div>
+              )}
+            </div>
+          </div>
+          
+          {/* Hinweis */}
+          <p className="mt-2 text-sm text-gray-500">
+            Ein Standort kann nur gelöscht werden, wenn noch keine Artikel darauf gebucht wurden.
+          </p>
+        </div>
       )}
     </Layout>
   );
