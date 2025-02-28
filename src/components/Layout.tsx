@@ -62,21 +62,68 @@ export default function Layout({ children }: LayoutProps) {
     },
     {
       name: 'Warenwirtschaft',
-      icon: BuildingStorefrontIcon,
+      icon: CubeIcon,
       children: [
-        { name: 'Hauptlager', href: '/hauptlager' },
-        { name: 'Standorte', href: '/standorte' },
-        { name: 'Artikel', href: '/artikel' },
-        { name: 'Hardware', href: '/hardware' },
-        { name: 'Bestellungen', href: '/bestellungen' },
-        { name: 'Ausbuchungen', href: '/ausbuchungen' },
-      ],
+        {
+          name: 'Bestellungen',
+          icon: ClipboardDocumentListIcon,
+          children: [
+            {
+              name: 'Neue Bestellung',
+              href: '/bestellungen/neu',
+              icon: ShoppingCartIcon
+            },
+            {
+              name: 'Meine Bestellungen',
+              href: '/bestellungen',
+              icon: ClipboardDocumentListIcon
+            }
+          ]
+        },
+        {
+          name: 'Stammdaten',
+          icon: ArchiveBoxIcon,
+          children: [
+            {
+              name: 'Standorte',
+              href: '/standorte',
+              icon: BuildingOfficeIcon
+            },
+            {
+              name: 'Artikel',
+              href: '/artikel',
+              icon: ArchiveBoxIcon
+            },
+            {
+              name: 'Hardware',
+              href: '/hardware',
+              icon: WrenchScrewdriverIcon
+            }
+          ]
+        },
+        {
+          name: 'Verwaltung',
+          icon: WrenchScrewdriverIcon,
+          children: [
+            {
+              name: 'Hauptlager',
+              href: '/hauptlager',
+              icon: BuildingStorefrontIcon
+            },
+            {
+              name: 'Ausbuchungen',
+              href: '/ausbuchungen',
+              icon: ArrowUpTrayIcon
+            }
+          ]
+        }
+      ]
     },
     {
       name: 'Einstellungen',
       href: '/einstellungen',
-      icon: Cog6ToothIcon,
-    },
+      icon: Cog6ToothIcon
+    }
   ];
 
   return (
