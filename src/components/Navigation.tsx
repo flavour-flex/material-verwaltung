@@ -8,6 +8,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { Session } from 'next-auth';
+
+interface CustomSession extends Session {
+  user: {
+    email?: string | null;
+    name?: string | null;
+    image?: string | null;
+    role?: string;
+  };
+}
 
 const navigation = [
   {
@@ -43,7 +53,7 @@ const navigation = [
 ];
 
 const Navigation = () => {
-  const { data: session } = useSession();
+  const { data: session } = useSession() as { data: CustomSession | null };
   const userRole = session?.user?.role;
   
   const showStandorte = userRole === 'ADMIN' || 

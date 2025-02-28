@@ -4,28 +4,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { sendBestellungVersendetEmail } from '@/lib/email';
+import { BestellungArtikelType, Verantwortlicher } from '@/types';
 
 interface VersandDialogProps {
   isOpen: boolean;
   onClose: () => void;
   bestellung: {
     id: string;
-    bestellung_artikel: {
-      id: string;          // Bestellung_artikel ID
-      artikel_id: string;  // Artikel ID
-      menge: number;
-      versandte_menge: number;
-      artikel: {
-        name: string;
-        artikelnummer: string;
-      };
-    }[];
+    bestellung_artikel: BestellungArtikelType[];
     standort: {
       name: string;
-      verantwortliche: Array<{
-        name: string;
-        email: string;
-      }>;
+      verantwortliche: Verantwortlicher[];
     };
   };
 }
