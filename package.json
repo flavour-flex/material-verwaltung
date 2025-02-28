@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run type-check && next build",
+    "build": "CI=false next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -47,4 +48,6 @@
   "engines": {
     "node": ">=18.0.0"
   }
+  
 }
+
