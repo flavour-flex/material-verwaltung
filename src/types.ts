@@ -30,8 +30,10 @@ export interface Artikel {
   id: string;
   name: string;
   artikelnummer: string;
+  beschreibung?: string;
   kategorie: string;
   einheit: string;
+  mindestbestand?: number;
   created_at?: string;
   updated_at?: string;
 }
