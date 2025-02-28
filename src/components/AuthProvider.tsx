@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,9 @@ export const AuthContext = createContext<AuthState>({
   isAuthenticated: false,
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const useAuth = () => useContext(AuthContext);
+
+const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [authState, setAuthState] = useState<AuthState>({
@@ -81,4 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-} 
+};
+
+export default AuthProvider; 
