@@ -34,7 +34,7 @@ export default function LoginPage() {
 
       // Nach erfolgreichem Login manuell weiterleiten
       const redirectPath = isAdmin ? '/dashboard' : '/bestellungen/neu';
-      window.location.href = redirectPath;
+      router.push(redirectPath);
 
     } catch (error: any) {
       console.error('Login error:', error);

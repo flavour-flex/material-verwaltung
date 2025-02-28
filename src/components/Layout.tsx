@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import {
   Bars3Icon,
@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import BackButton from '@/components/ui/BackButton';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -39,6 +40,25 @@ export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { user, isAdmin, userRole } = useAuth();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleFocus = () => {
+      supabase.auth.startAutoRefresh();
+      queryClient.invalidateQueries();
+    };
+
+    const handleBlur = () => {
+      supabase.auth.stopAutoRefresh();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [queryClient]);
 
   const handleLogout = async () => {
     try {
@@ -301,11 +321,60 @@ export default function Layout({ children }: LayoutProps) {
 
       <main className="py-6">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="bg-white shadow-sm rounded-lg p-6">
-            {children}
+          <BackButton />
+          <div className="bg-white shadow-sm rounded-lg p-6 min-h-[500px] relative">
+            <Transition
+              show={true}
+              enter="transition-opacity duration-200"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="transition-opacity duration-150"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              {/* Skeleton Loader */}
+              <div className="absolute inset-0 bg-white rounded-lg p-6" 
+                   style={{ display: children ? 'none' : 'block' }}>
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                    <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                    <div className="h-32 bg-gray-200 rounded"></div>
+                    <div className="h-32 bg-gray-200 rounded"></div>
+                    <div className="h-32 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actual Content */}
+              <div className={`transition-opacity duration-200 ${children ? 'opacity-100' : 'opacity-0'}`}>
+                {children}
+              </div>
+            </Transition>
           </div>
         </div>
       </main>
     </div>
+  );
+}
+
+// Neue Komponente für den Seiteninhalt
+export function PageContent({ children, isLoading }: { children: React.ReactNode, isLoading?: boolean }) {
+  return (
+    <Transition
+      show={!isLoading}
+      enter="transition-opacity duration-200"
+      enterFrom="opacity-0"
+      enterTo="opacity-100"
+      leave="transition-opacity duration-150"
+      leaveFrom="opacity-100"
+      leaveTo="opacity-0"
+    >
+      {children}
+    </Transition>
   );
 } 

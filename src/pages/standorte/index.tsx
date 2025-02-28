@@ -44,21 +44,21 @@ export default function StandortePage() {
 
   return (
     <Layout>
-      <div className="md:flex md:items-center md:justify-between mb-8">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Standorte
-          </h2>
+      <div className="sm:flex sm:items-center">
+        <div className="sm:flex-auto">
+          <h1 className="text-2xl font-semibold text-gray-900">Standorte</h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Übersicht aller Standorte und deren Verantwortliche.
+          </p>
         </div>
         {isAdmin && (
-          <div className="mt-4 flex md:ml-4 md:mt-0">
-            <button
-              type="button"
-              className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-              onClick={() => {/* Hier Logik für neuen Standort */}}
+          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <Link
+              href="/standorte/neu"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#023770] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#034694] focus:outline-none focus:ring-2 focus:ring-[#023770] focus:ring-offset-2 sm:w-auto"
             >
               Neuer Standort
-            </button>
+            </Link>
           </div>
         )}
       </div>

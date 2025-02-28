@@ -11,6 +11,10 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
+  onDemandEntries: {
+    maxInactiveAge: 60 * 60 * 1000,
+    pagesBufferLength: 5,
+  },
 }
 
 module.exports = nextConfig 

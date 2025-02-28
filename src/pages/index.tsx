@@ -14,36 +14,18 @@ export default function DashboardPage() {
     queryFn: async () => {
       try {
         const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        console.log('Formatted date:', currentDate); // Debug-Ausgabe
 
         const [bestellungen, hardware] = await Promise.all([
           supabase.from('bestellungen').select('status').eq('status', 'offen'),
           supabase.from('hardware').select('id'),
         ]);
 
-        // Separate Hardware-Abfrage für besseres Debugging
-        console.log('Attempting service query with date:', currentDate);
-
         const { data: serviceData, error: serviceError } = await supabase
           .from('hardware')
           .select('id, last_service')
           .lt('last_service', currentDate);
 
-        if (serviceError) {
-          console.error('Service Query Error:', {
-            message: serviceError.message,
-            details: serviceError.details,
-            hint: serviceError.hint,
-            code: serviceError.code
-          });
-          throw serviceError;
-        }
-
-        console.log('Service Data:', {
-          count: serviceData?.length || 0,
-          firstFew: serviceData?.slice(0, 3),
-          dateExample: serviceData?.[0]?.last_service
-        });
+        if (serviceError) throw serviceError;
 
         return {
           offeneBestellungen: bestellungen.data?.length || 0,
