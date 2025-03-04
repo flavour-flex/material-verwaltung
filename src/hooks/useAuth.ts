@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/router';
 
 export function useAuth() {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [verantwortlicherStandorte, setVerantwortlicherStandorte] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
@@ -20,6 +18,7 @@ export function useAuth() {
           if (isMounted) {
             setUser(null);
             setUserRole(null);
+            setIsLoading(false);
           }
           return;
         }
@@ -35,31 +34,25 @@ export function useAuth() {
         if (isMounted) {
           setUser(session.user);
           setUserRole(userData?.role || null);
-
-          // Standorte für Standortverantwortliche abrufen
+          
           if (userData?.role === 'standortverantwortlich' && session.user.email) {
             const { data: standorte, error: standorteError } = await supabase
               .from('standorte')
-              .select('id, verantwortliche');
+              .select('id')
+              .contains('verantwortliche', [{ email: session.user.email }]);
             
-            if (!standorteError && standorte && isMounted) {
-              const zugewieseneStandorte = standorte
-                .filter(standort => 
-                  Array.isArray(standort.verantwortliche) && 
-                  standort.verantwortliche.includes(session.user.email)
-                )
-                .map(s => s.id);
-              
-              setVerantwortlicherStandorte(zugewieseneStandorte);
-            } else if (standorteError) {
-              console.error('Error fetching standorte:', standorteError);
+            if (!standorteError && standorte) {
+              setVerantwortlicherStandorte(standorte.map(s => s.id));
             }
           }
+          
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Error in fetchUserData:', error);
-      } finally {
         if (isMounted) {
+          setUser(null);
+          setUserRole(null);
           setIsLoading(false);
         }
       }
@@ -67,7 +60,16 @@ export function useAuth() {
 
     fetchUserData();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(fetchUserData);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setUser(null);
+          setUserRole(null);
+          setVerantwortlicherStandorte([]);
+        }
+      }
+      fetchUserData();
+    });
 
     return () => {
       isMounted = false;

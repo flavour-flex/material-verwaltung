@@ -1,11 +1,17 @@
 import React from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode }) {
+interface Props {
+  children: React.ReactNode;
+  queryClient?: QueryClient;
+}
+
+interface State {
+  hasError: boolean;
+}
+
+class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
     super(props);
     this.state = { hasError: false };
   }
@@ -16,8 +22,9 @@ class ErrorBoundary extends React.Component<
 
   handleRetry = () => {
     // Cache leeren und neu laden
-    const queryClient = useQueryClient();
-    queryClient.clear();
+    if (this.props.queryClient) {
+      this.props.queryClient.clear();
+    }
     // Seite neu laden
     window.location.reload();
   };

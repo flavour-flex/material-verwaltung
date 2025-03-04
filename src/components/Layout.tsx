@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import BackButton from '@/components/ui/BackButton';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -37,8 +38,8 @@ interface NavigationItem {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const { user, isAdmin, userRole, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const { user, isAdmin, userRole } = useAuth();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -59,6 +60,14 @@ export default function Layout({ children }: LayoutProps) {
       window.removeEventListener('blur', handleBlur);
     };
   }, [queryClient]);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {

@@ -33,47 +33,67 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAdmin: false,
     isStandortverantwortlich: false,
     isLoading: true,
-    isAuthenticated: false,
+    isAuthenticated: false
   });
 
   const fetchUserData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
+      
       if (!session?.user) {
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+        setAuthState(prev => ({
+          ...prev,
+          user: null,
+          userRole: null,
+          isLoading: false,
+          isAuthenticated: false
+        }));
         return;
       }
 
       const { data: userData, error } = await supabase
         .from('users')
-        .select('*')
+        .select('role')
         .eq('id', session.user.id)
         .single();
 
       if (error) throw error;
 
+      let verantwortlicherStandorte: string[] = [];
+      if (userData?.role === 'standortverantwortlich' && session.user.email) {
+        const { data: standorte } = await supabase
+          .from('standorte')
+          .select('id')
+          .contains('verantwortliche', [{ email: session.user.email }]);
+        
+        if (standorte) {
+          verantwortlicherStandorte = standorte.map(s => s.id);
+        }
+      }
+
       setAuthState({
         user: session.user,
         userRole: userData?.role || null,
-        verantwortlicherStandorte: userData?.verantwortlicher_standorte || [],
-        isAdmin: userData?.role === 'ADMIN',
-        isStandortverantwortlich: userData?.role === 'STANDORT_VERANTWORTLICHER',
+        verantwortlicherStandorte,
+        isAdmin: userData?.role === 'admin',
+        isStandortverantwortlich: userData?.role === 'standortverantwortlich',
         isLoading: false,
         isAuthenticated: true
       });
 
     } catch (error) {
       console.error('Error fetching user data:', error);
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      setAuthState(prev => ({
+        ...prev,
+        isLoading: false,
+        isAuthenticated: false
+      }));
     }
   };
 
   useEffect(() => {
-    // Initial auth check
     fetchUserData();
 
-    // Auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setAuthState({
@@ -85,11 +105,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           isLoading: false,
           isAuthenticated: false
         });
-
-        // Bei Logout zur Login-Seite weiterleiten
-        if (router.pathname !== '/login') {
-          window.location.href = '/login';
-        }
       } else if (event === 'SIGNED_IN' && session) {
         await fetchUserData();
       }
